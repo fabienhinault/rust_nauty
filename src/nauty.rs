@@ -1,4 +1,4 @@
-use crate::graph6::{self, BIAS6, encode_graph_size, g6_len};
+use crate::{graph6::BIT, gtools::g6string::G6String};
 
 /// From nauty.h:
 ///
@@ -60,24 +60,15 @@ impl<const M: usize> Graph<M> {
     // function ntog6 in gtools.c in nauty
     // https://users.cecs.anu.edu.au/~bdm/data/formats.txt
     pub fn to_graph6(&self) -> String {
-        let mut gcode = Vec::with_capacity(g6_len(self.n()));
-        gcode.append(&mut encode_graph_size(self.n()));
-        let mut k = 6;
-        let mut x: u8 = 0;
-        for (j, row) in self.0.iter().enumerate() {
-            row.append_g6(&mut gcode, j, &mut x, &mut k);
-        }
-        if k != 6 {
-            gcode.push(BIAS6 + (x << k));
-        }
-        gcode.push(b'\n');
-        String::from_utf8(gcode).expect("String::from_utf8")
+        let mut g6 = G6String::from(self);
+        g6.finish();
+        g6.to_string()
     }
 }
 
 impl<const M: usize> Set<M> {
     pub fn is_element(&self, pos: usize) -> bool {
-        (self.words[Self::set_wd(pos)] & graph6::BIT[Self::set_bt(pos)]) != 0
+        (self.words[Self::set_wd(pos)] & BIT[Self::set_bt(pos)]) != 0
     }
 
     pub fn set_wd(pos: usize) -> usize {
@@ -86,21 +77,6 @@ impl<const M: usize> Set<M> {
 
     pub fn set_bt(pos: usize) -> usize {
         pos & (WORDSIZE - 1)
-    }
-
-    pub fn append_g6(&self, gcode: &mut Vec<u8>, j: usize, x: &mut u8, k: &mut i32) {
-        for i in 0..j {
-            *x <<= 1;
-            *k -= 1;
-            if self.is_element(i) {
-                *x |= 1;
-            }
-            if *k == 0 {
-                gcode.push(BIAS6 + *x);
-                *k = 6;
-                *x = 0;
-            }
-        }
     }
 }
 
@@ -113,9 +89,9 @@ mod test {
         // for i in 0.. 10000 {
         //     let j =
         // }
-        assert_eq!(64, graph6::BIT.len());
-        for i in 0..graph6::BIT.len() {
-            assert_eq!(1 << (63 - i), graph6::BIT[i])
+        assert_eq!(64, BIT.len());
+        for (i_bit, bit) in BIT.into_iter().enumerate() {
+            assert_eq!(1 << (63 - i_bit), bit)
         }
     }
     // example from https://users.cecs.anu.edu.au/~bdm/data/formats.txt, line 73
@@ -137,19 +113,19 @@ mod test {
     fn create_example() -> Graph<1> {
         Graph(vec![
             Set {
-                words: [graph6::BIT[2] | graph6::BIT[4]], // 0 0-2, 0-4
+                words: [BIT[2] | BIT[4]], // 0 0-2, 0-4
             },
             Set {
-                words: [graph6::BIT[3]], // 1 1-3
+                words: [BIT[3]], // 1 1-3
             },
             Set {
-                words: [graph6::BIT[0]], // 2 0-2
+                words: [BIT[0]], // 2 0-2
             },
             Set {
-                words: [graph6::BIT[1] | graph6::BIT[4]], // 3  1-3 3-4
+                words: [BIT[1] | BIT[4]], // 3  1-3 3-4
             },
             Set {
-                words: [graph6::BIT[0] | graph6::BIT[3]], // 4 0-4 3-4
+                words: [BIT[0] | BIT[3]], // 4 0-4 3-4
             },
         ])
     }

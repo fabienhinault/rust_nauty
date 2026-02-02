@@ -1,5 +1,6 @@
 mod env;
 mod graph6;
+pub mod gtools;
 mod level_data;
 mod nauty;
 
