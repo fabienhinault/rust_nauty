@@ -41,7 +41,7 @@ use crate::{graph6::BIT, gtools::g6string::G6String};
 /// *    This is  refined for the root of the tree, which has level 1.           *
 ///
 /// here WORDSIZE == 64
-const WORDSIZE: usize = 64;
+pub const WORDSIZE: usize = 64;
 const LOG_WORDSIZE: u8 = 6;
 pub struct Graph<const M: usize>(pub Vec<Set<M>>);
 
