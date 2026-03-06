@@ -20,12 +20,12 @@ pub struct LevelData {
     pub xub: usize,
     lo: SetWord,
     hi: SetWord,
-    xstart: [SetWord; MAXN + 1],
+    pub xstart: [usize; MAXN + 1],
     // xset: Vec<SetWord>,
     // xcard: Vec<SetWord>,
     x_set_card: Vec<SetCard>,
     xinv: Vec<usize>,
-    xorb: Vec<SetWord>,
+    pub xorb: Vec<usize>,
     xx: Vec<SetWord>,
     xlim: SetWord,
 }
@@ -96,10 +96,10 @@ impl LevelData {
             d.xstart[0] = 0;
             for i in 1..nxsets {
                 if d.x_set_card[i].card > d.x_set_card[i - 1].card {
-                    d.xstart[d.xcard(i) as usize] = i as SetWord;
+                    d.xstart[d.xcard(i) as usize] = i;
                 }
             }
-            d.xstart[(d.xcard(nxsets - 1) + 1) as usize] = nxsets as SetWord;
+            d.xstart[(d.xcard(nxsets - 1) + 1) as usize] = nxsets;
         }
 
         // Initialize xstart arrays for each level

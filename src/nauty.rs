@@ -1,3 +1,5 @@
+use bitvec::{bitvec, vec::BitVec};
+
 use crate::{graph6::BIT, gtools::g6string::G6String};
 
 /// From nauty.h:
@@ -40,17 +42,20 @@ use crate::{graph6::BIT, gtools::g6string::G6String};
 /// *    ptn[j] <= x.  The partition at level 0 is given to nauty by the user.   *
 /// *    This is  refined for the root of the tree, which has level 1.           *
 ///
-/// here WORDSIZE == 64
-pub const WORDSIZE: usize = 64;
-const LOG_WORDSIZE: u8 = 6;
+/// here WORDSIZE == size_of(usize) (64)
+pub const WORDSIZE: usize = SetWord::BITS as usize;
+const LOG_WORDSIZE: u8 = (WORDSIZE - 1).count_ones() as u8;
+
+#[derive(Default)]
 pub struct Graph<const M: usize>(pub Vec<Set<M>>);
+pub type NautyCounter = u128;
 
 /// the vertices adjacent to vertex i
 pub struct Set<const M: usize> {
     pub words: [SetWord; M],
 }
 
-pub type SetWord = u64;
+pub type SetWord = usize;
 
 impl<const M: usize> Graph<M> {
     pub fn n(&self) -> usize {
@@ -63,6 +68,21 @@ impl<const M: usize> Graph<M> {
         let mut g6 = G6String::from(self);
         g6.finish();
         g6.to_string()
+    }
+
+    pub fn isconnected(&self) -> bool {
+        let n = self.n();
+        let allbits = bitvec![1; n];
+        let mut expanded = BIT[n - 1];
+        let mut seen = expanded | self.0[n - 1].words[0];
+        let mut toexpand = (seen & !expanded);
+        while seen != allbits && toexpand != 0 {
+            let i = toexpand.leading_zeros() + 1 as usize;
+            expanded |= BIT[i];
+            seen |= self.0[i].words[0];
+            toexpand = (seen & !expanded);
+        }
+        BitVec::from(seen) == allbits
     }
 }
 

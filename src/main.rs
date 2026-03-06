@@ -66,11 +66,14 @@ fn main() {
         }
         let mut data: Vec<LevelData> = LevelData::make(sparse, maxn, maxdeg);
         xbnds(&env, 1, 0, 0, &mut data[1]);
-        let extender = Extender {
+        let xlb = data[1].xlb;
+        let xub = data[1].xub;
+        let mut extender = Extender {
             maxn,
             mindeg,
-            dlow: todo!(),
+            nodes: vec![],
+            data,
         };
-        genextend(g, 1, &deg, 0, true, data[1].xlb, data[1].xub);
+        extender.genextend(&mut g, 1, &deg, 0, true, xlb, xub);
     }
 }
