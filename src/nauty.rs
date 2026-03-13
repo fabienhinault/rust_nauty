@@ -1,6 +1,5 @@
-use bitvec::{bitvec, vec::BitVec};
-
 use crate::{graph6::BIT, gtools::g6string::G6String};
+use bitvec::{bitvec, order::Msb0, vec::BitVec};
 
 /// From nauty.h:
 ///
@@ -43,21 +42,16 @@ use crate::{graph6::BIT, gtools::g6string::G6String};
 /// *    This is  refined for the root of the tree, which has level 1.           *
 ///
 /// here WORDSIZE == size_of(usize) (64)
-pub const WORDSIZE: usize = SetWord::BITS as usize;
+pub const WORDSIZE: usize = usize::BITS as usize;
 const LOG_WORDSIZE: u8 = (WORDSIZE - 1).count_ones() as u8;
 
+// the BitVec of index i has the vertices adjascent to vertex of index i.
+// g.0[i][j] == 1 iff (i, j) is an edge of g.
 #[derive(Default)]
-pub struct Graph<const M: usize>(pub Vec<Set<M>>);
+pub struct Graph(pub Vec<BitVec<usize, Msb0>>);
 pub type NautyCounter = u128;
 
-/// the vertices adjacent to vertex i
-pub struct Set<const M: usize> {
-    pub words: [SetWord; M],
-}
-
-pub type SetWord = usize;
-
-impl<const M: usize> Graph<M> {
+impl Graph {
     pub fn n(&self) -> usize {
         self.0.len()
     }
@@ -73,47 +67,34 @@ impl<const M: usize> Graph<M> {
     pub fn isconnected(&self) -> bool {
         let n = self.n();
         let allbits = bitvec![1; n];
-        let mut expanded = BIT[n - 1];
-        let mut seen = expanded | self.0[n - 1].words[0];
-        let mut toexpand = (seen & !expanded);
-        while seen != allbits && toexpand != 0 {
-            let i = toexpand.leading_zeros() + 1 as usize;
-            expanded |= BIT[i];
-            seen |= self.0[i].words[0];
-            toexpand = (seen & !expanded);
+        let mut expanded = BitVec::from_element(BIT[n - 1]);
+        let mut seen = expanded.clone() | self.0[n - 1].clone();
+        let mut toexpand = seen.clone() & !expanded.clone();
+        while seen != allbits && toexpand.any() {
+            let i = toexpand.leading_zeros();
+            expanded |= BitVec::from_element(BIT[i]);
+            seen |= self.0[i].clone();
+            toexpand = seen.clone() & !expanded.clone();
         }
-        BitVec::from(seen) == allbits
-    }
-}
-
-impl<const M: usize> Set<M> {
-    pub fn is_element(&self, pos: usize) -> bool {
-        (self.words[Self::set_wd(pos)] & BIT[Self::set_bt(pos)]) != 0
-    }
-
-    pub fn set_wd(pos: usize) -> usize {
-        pos >> LOG_WORDSIZE
-    }
-
-    pub fn set_bt(pos: usize) -> usize {
-        pos & (WORDSIZE - 1)
+        seen[..n] == allbits
     }
 }
 
 #[cfg(test)]
 mod test {
+
     use super::*;
 
-    #[test]
-    fn test_bit() {
-        // for i in 0.. 10000 {
-        //     let j =
-        // }
-        assert_eq!(64, BIT.len());
-        for (i_bit, bit) in BIT.into_iter().enumerate() {
-            assert_eq!(1 << (63 - i_bit), bit)
-        }
-    }
+    // #[test]
+    // fn test_bit() {
+    //     // for i in 0.. 10000 {
+    //     //     let j =
+    //     // }
+    //     assert_eq!(64, BIT.len());
+    //     for (i_bit, bit) in BIT.into_iter().enumerate() {
+    //         assert_eq!(1 << (63 - i_bit), bit)
+    //     }
+    // }
     // example from https://users.cecs.anu.edu.au/~bdm/data/formats.txt, line 73
     #[test]
     fn test_to_graph6() {
@@ -124,29 +105,39 @@ mod test {
     }
 
     #[test]
-    fn test_is_element() {
-        let g = create_example();
-        assert!(g.0[3].is_element(1));
+    fn test_example_is_connected() {
+        assert!(create_example().isconnected());
+    }
+
+    #[test]
+    fn test_disconnected() {
+        assert!(!create_disconnected().isconnected());
     }
 
     // example from https://users.cecs.anu.edu.au/~bdm/data/formats.txt, line 73
-    fn create_example() -> Graph<1> {
+    //
+    //  2---0---4---3---1
+    //
+    fn create_example() -> Graph {
         Graph(vec![
-            Set {
-                words: [BIT[2] | BIT[4]], // 0 0-2, 0-4
-            },
-            Set {
-                words: [BIT[3]], // 1 1-3
-            },
-            Set {
-                words: [BIT[0]], // 2 0-2
-            },
-            Set {
-                words: [BIT[1] | BIT[4]], // 3  1-3 3-4
-            },
-            Set {
-                words: [BIT[0] | BIT[3]], // 4 0-4 3-4
-            },
+            //                   0  1  2  3  4
+            bitvec![usize, Msb0; 0, 0, 1, 0, 1],
+            bitvec![usize, Msb0; 0, 0, 0, 1, 0],
+            bitvec![usize, Msb0; 1, 0, 0, 0, 0],
+            bitvec![usize, Msb0; 0, 1, 0, 0, 1],
+            bitvec![usize, Msb0; 1, 0, 0, 1, 0],
+        ])
+    }
+
+    //  2---0   4---3---1
+    fn create_disconnected() -> Graph {
+        Graph(vec![
+            //                   0  1  2  3  4
+            bitvec![usize, Msb0; 0, 0, 1, 0, 0],
+            bitvec![usize, Msb0; 0, 0, 0, 1, 0],
+            bitvec![usize, Msb0; 1, 0, 0, 0, 0],
+            bitvec![usize, Msb0; 0, 1, 0, 0, 1],
+            bitvec![usize, Msb0; 0, 0, 0, 1, 0],
         ])
     }
 }
