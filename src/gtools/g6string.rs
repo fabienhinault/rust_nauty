@@ -16,11 +16,11 @@ const MAXBYTE: u8 = 126;
 const C6MASK: usize = 63;
 
 impl G6String {
-    pub fn from<const M: usize>(g: &Graph<M>) -> Self {
+    pub fn from(g: &Graph) -> Self {
         let mut g6_string = Self::new(g.n());
         for (i_row, row) in g.0.iter().enumerate() {
             for i_other_vertex in 0..i_row {
-                g6_string.push(row.is_element(i_other_vertex));
+                g6_string.push(row[i_other_vertex]);
             }
         }
         g6_string
