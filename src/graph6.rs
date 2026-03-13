@@ -1,8 +1,9 @@
-use crate::nauty::SetWord;
-
 // https://users.cecs.anu.edu.au/~bdm/data/formats.txt
 
-pub const BIT: [SetWord; 64] = [
+// pub const BIT: [&BitSlice<usize, Msb0>; 64] =
+//     from_fn(|i| ((1 << (63 - i)) as usize).view_bits::<Msb0>());
+
+pub const BIT: [usize; 64] = [
     0x8000000000000000,
     0x4000000000000000,
     0x2000000000000000,

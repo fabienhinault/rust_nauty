@@ -1,13 +1,13 @@
 use clap::Parser;
 use cli::GengCli;
 use env::Env;
-use geng::Extender;
-use level_data::{LevelData, xbnds};
-use nauty::{Graph, Set, SetWord, WORDSIZE};
+//use geng::Extender;
+use level_data::LevelData;
+use nauty::{Graph, WORDSIZE};
 
 pub mod cli;
 mod env;
-mod geng;
+//mod geng;
 mod graph6;
 pub mod gtools;
 mod level_data;
@@ -33,7 +33,7 @@ fn main() {
     }
     let mut ecount = vec![0; 1 + maxn * (maxn - 1)];
 
-    let mut g = Graph(vec![Set { words: [0] }]);
+    let mut g = Graph::default();
     let mut deg: [usize; 1] = [0];
 
     let connec: u8;
@@ -55,7 +55,7 @@ fn main() {
             maxdeg: 1,
         };
         let mut sparse = args.bipartite || args.squarefree || args.trianglefree || args.savemem;
-        if maxn > 28 || maxn + 4 > 8 * SetWord::BITS as usize {
+        if maxn > 28 || maxn + 4 > 8 * 64usize {
             args.savemem = true;
             sparse = true;
         }
@@ -65,15 +65,15 @@ fn main() {
             sparse = true;
         }
         let mut data: Vec<LevelData> = LevelData::make(sparse, maxn, maxdeg);
-        xbnds(&env, 1, 0, 0, &mut data[1]);
+        data[1].xbnds(&env, 1, 0, 0);
         let xlb = data[1].xlb;
         let xub = data[1].xub;
-        let mut extender = Extender {
-            maxn,
-            mindeg,
-            nodes: vec![],
-            data,
-        };
-        extender.genextend(&mut g, 1, &deg, 0, true, xlb, xub);
+        // let mut extender = Extender {
+        //     maxn,
+        //     mindeg,
+        //     nodes: vec![],
+        //     data,
+        // };
+        // extender.genextend(&mut g, 1, &deg, 0, true, xlb, xub);
     }
 }

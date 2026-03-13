@@ -1,8 +1,4 @@
-use crate::{
-    Graph,
-    level_data::LevelData,
-    nauty::{NautyCounter, SetWord},
-};
+use crate::{Graph, level_data::LevelData, nauty::NautyCounter};
 
 pub struct Extender {
     pub maxn: usize,
@@ -16,7 +12,7 @@ impl Extender {
     /* extend from n to n+1 -- version for general graphs */
     pub fn genextend(
         &mut self,
-        g: &mut Graph<1>,
+        g: &mut Graph,
         n: usize,
         deg: &[usize],
         ne: usize,
@@ -30,7 +26,7 @@ impl Extender {
         let nx = n + 1;
         let dmax = deg[n - 1];
         let dcrit = self.mindeg - self.maxn + n;
-        let mut d = 0;
+        let mut d: usize = 0;
         let mut dlow = 0;
         for i in 0..n {
             if deg[i] == dmax {
@@ -54,7 +50,7 @@ impl Extender {
         let imax = self.data[n].xstart[xub + 1];
         //let x_set_card = &mut data.x_set_card;
         let xorb = &self.data[n].xorb;
-        let mut gx: Graph<1> = Graph.default();
+        let mut gx: Graph = Graph::default();
         if nx == self.maxn {
             for i in imin..imax {
                 if !rigid && xorb[i] != i {
@@ -76,8 +72,8 @@ impl Extender {
                     deg,
                     xc > dmax + 1 || (xc == dmax + 1 && (x & d) == 0),
                 ) && (self.connec == 0
-                    || (self.connec == 1 && isconnected(gx, nx))
-                    || (self.connec == 2 && isbiconnected(gx, nx)))
+                    || (self.connec == 1 && gx.isconnected())
+                    || (self.connec == 2 && gx.isbiconnected()))
                 {
                     ecount[ne + xc] += 1;
                     println!(
