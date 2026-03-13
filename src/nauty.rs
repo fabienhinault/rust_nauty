@@ -1,4 +1,4 @@
-use crate::{graph6::BIT, gtools::g6string::G6String};
+use crate::{MAXN, graph6::BIT, gtools::g6string::G6String};
 use bitvec::{bitvec, order::Msb0, vec::BitVec};
 
 /// From nauty.h:
@@ -78,6 +78,58 @@ impl Graph {
         }
         seen[..n] == allbits
     }
+
+    // static boolean isbiconnected(graph *g, int n)
+    /* test if g is biconnected */
+    pub fn isbiconnected(&self) -> bool {
+        let n = self.n();
+        if n <= 2 {
+            return false;
+        }
+        let mut visited = BitVec::from_element(BIT[0]);
+        let mut stack = vec![0_usize; MAXN];
+        let mut num = vec![0_usize; MAXN];
+        let mut lp = vec![0_usize; MAXN];
+        let mut numvis = 1_usize;
+        let mut sp = 0_usize;
+        let mut v = 0_usize;
+        let mut w;
+
+        loop {
+            let mut sw = self.0[v].clone() & !visited.clone();
+            if sw.any() {
+                w = v;
+                v = sw.leading_zeros(); /* visit next child */
+                sp += 1;
+                stack[sp] = v;
+                visited |= BitVec::from_element(BIT[v]);
+                numvis += 1;
+                lp[v] = numvis;
+                num[v] = numvis;
+                sw = self.0[v].clone() & visited.clone() & !BitVec::from_element(BIT[w]);
+                while sw.any() {
+                    w = sw.leading_zeros();
+                    sw &= !BitVec::from_element(BIT[w]);
+                    if num[w] < lp[v] {
+                        lp[v] = num[w];
+                    }
+                }
+            } else {
+                w = v; /* back up to parent */
+                if sp <= 1 {
+                    return numvis == n;
+                }
+                sp -= 1;
+                v = stack[sp];
+                if lp[w] >= num[v] {
+                    return false;
+                }
+                if lp[w] < lp[v] {
+                    lp[v] = lp[w];
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -114,6 +166,21 @@ mod test {
         assert!(!create_disconnected().isconnected());
     }
 
+    #[test]
+    fn test_disconnected_isbiconnected() {
+        assert!(!create_disconnected().isbiconnected());
+    }
+
+    #[test]
+    fn test_example_isbiconnected() {
+        assert!(!create_example().isbiconnected());
+    }
+
+    #[test]
+    fn test_circle_isbiconnected() {
+        assert!(create_circle().isbiconnected());
+    }
+
     // example from https://users.cecs.anu.edu.au/~bdm/data/formats.txt, line 73
     //
     //  2---0---4---3---1
@@ -138,6 +205,19 @@ mod test {
             bitvec![usize, Msb0; 1, 0, 0, 0, 0],
             bitvec![usize, Msb0; 0, 1, 0, 0, 1],
             bitvec![usize, Msb0; 0, 0, 0, 1, 0],
+        ])
+    }
+
+    //  ,---------------.
+    //  2---0---4---3---1
+    fn create_circle() -> Graph {
+        Graph(vec![
+            //                   0  1  2  3  4
+            bitvec![usize, Msb0; 0, 0, 1, 0, 1],
+            bitvec![usize, Msb0; 0, 0, 1, 1, 0],
+            bitvec![usize, Msb0; 1, 1, 0, 0, 0],
+            bitvec![usize, Msb0; 0, 1, 0, 0, 1],
+            bitvec![usize, Msb0; 1, 0, 0, 1, 0],
         ])
     }
 }
