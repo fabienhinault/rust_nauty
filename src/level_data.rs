@@ -26,7 +26,7 @@ pub struct LevelData {
     // xset: Vec<SetWord>,
     // xcard: Vec<SetWord>,
     x_set_card: Vec<SetCard>, /* array of all x-sets in card order, cardinalities of all x-sets */
-    xinv: Vec<usize>,         /* map from x-set to index in xset */
+    xinv: Vec<Option<usize>>, /* map from x-set to index in xset */
     pub xorb: Vec<usize>,     /* min orbit representative */
     xx: Vec<usize>,           /* (-b, -t, -s, -m) candidate x-sets */
     /*   note: can be the same as xcard */
@@ -54,6 +54,7 @@ impl LevelData {
     /* make the level data for each level */
     pub fn make(restricted: bool, maxn: usize, maxdeg: usize) -> Vec<Self> {
         let mut data: Vec<LevelData> = Vec::with_capacity(maxn);
+        data.push(LevelData::default());
         for n in 1..maxn {
             let nn = min(n, maxdeg);
             let mut ncj: usize = 1;
@@ -72,10 +73,9 @@ impl LevelData {
             }
             let tttn: usize = 1 << n;
             d.x_set_card = Vec::with_capacity(nxsets);
-            d.xinv = Vec::with_capacity(tttn);
+            d.xinv = vec![None; tttn];
             d.xorb = Vec::with_capacity(nxsets);
 
-            let mut j = 0;
             let ilast = if n == WORD_SIZE {
                 usize::MAX
             } else {
@@ -83,23 +83,22 @@ impl LevelData {
             };
             for i in 0..ilast {
                 let h: usize = i.count_ones() as usize;
-                if h <= maxdeg as usize {
-                    d.x_set_card[j] = SetCard { card: h, set: i };
-                    j += 1;
+                if h <= maxdeg {
+                    d.x_set_card.push(SetCard { card: h, set: i });
                 }
                 if i == ilast {
                     break;
                 }
             }
 
-            if j != nxsets {
+            if d.x_set_card.len() != nxsets {
                 panic!();
             }
 
             d.x_set_card.sort();
 
             for i in 0..nxsets {
-                d.xinv[d.x_set_card[i].set as usize] = i;
+                d.xinv[d.x_set_card[i].set] = Some(i);
             }
 
             d.xstart[0] = 0;
@@ -109,6 +108,7 @@ impl LevelData {
                 }
             }
             d.xstart[(d.xcard(nxsets - 1) + 1) as usize] = nxsets;
+            data.push(d);
         }
 
         // Initialize xstart arrays for each level

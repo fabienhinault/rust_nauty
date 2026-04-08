@@ -90,7 +90,11 @@ impl Extender {
     }
 }
 
+fn accept2(g: &mut Graph, n: usize, x: usize, gx: Graph, deg: &[usize], d: bool) -> bool {
+    todo!()
+}
+
 #[inline(always)]
-fn xbit(i: usize) -> SetWord {
+fn xbit(i: usize) -> usize {
     1 << i
 }

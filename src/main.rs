@@ -46,7 +46,7 @@ fn main() {
     }
     if maxn == 1 {
         ecount[0] += 1;
-        println!("{}", g.to_graph6());
+        println!("{}", Graph::one().to_graph6());
     } else {
         let env = Env {
             maxn: 2,

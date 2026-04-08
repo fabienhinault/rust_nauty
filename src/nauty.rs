@@ -52,6 +52,11 @@ pub struct Graph(pub Vec<BitVec<usize, Msb0>>);
 pub type NautyCounter = u128;
 
 impl Graph {
+    // graph with one vertex and no edge
+    pub fn one() -> Self {
+        Self(vec![bitvec![usize, Msb0; 0]])
+    }
+
     pub fn n(&self) -> usize {
         self.0.len()
     }
@@ -80,6 +85,8 @@ impl Graph {
     }
 
     // static boolean isbiconnected(graph *g, int n)
+    // https://en.wikipedia.org/wiki/Biconnected_graph
+    // A connected graph that is not broken into disconnected pieces by deleting any single vertex (and incident edges).
     /* test if g is biconnected */
     pub fn isbiconnected(&self) -> bool {
         let n = self.n();
@@ -87,11 +94,10 @@ impl Graph {
             return false;
         }
         let mut visited = BitVec::from_element(BIT[0]);
-        let mut stack = vec![0_usize; MAXN];
+        let mut stack = vec![];
         let mut num = vec![0_usize; MAXN];
         let mut lp = vec![0_usize; MAXN];
         let mut numvis = 1_usize;
-        let mut sp = 0_usize;
         let mut v = 0_usize;
         let mut w;
 
@@ -100,8 +106,7 @@ impl Graph {
             if sw.any() {
                 w = v;
                 v = sw.leading_zeros(); /* visit next child */
-                sp += 1;
-                stack[sp] = v;
+                stack.push(v);
                 visited |= BitVec::from_element(BIT[v]);
                 numvis += 1;
                 lp[v] = numvis;
@@ -116,11 +121,10 @@ impl Graph {
                 }
             } else {
                 w = v; /* back up to parent */
-                if sp <= 1 {
+                if stack.len() <= 1 {
                     return numvis == n;
                 }
-                sp -= 1;
-                v = stack[sp];
+                v = stack.pop().unwrap();
                 if lp[w] >= num[v] {
                     return false;
                 }
@@ -181,6 +185,11 @@ mod test {
         assert!(create_circle().isbiconnected());
     }
 
+    #[test]
+    fn test_n_circle_isbiconnected() {
+        assert!(create_n_circle(6).isbiconnected());
+    }
+
     // example from https://users.cecs.anu.edu.au/~bdm/data/formats.txt, line 73
     //
     //  2---0---4---3---1
@@ -219,5 +228,21 @@ mod test {
             bitvec![usize, Msb0; 0, 1, 0, 0, 1],
             bitvec![usize, Msb0; 1, 0, 0, 1, 0],
         ])
+    }
+
+    //  ,---------------- ... --.
+    //  0---1---2---3---4 ... --n
+    fn create_n_circle(n: usize) -> Graph {
+        Graph((0..n).map(|i| create_n_circle_bitvec(n, i)).collect())
+    }
+
+    fn create_n_circle_bitvec(n: usize, i: usize) -> BitVec<usize, Msb0> {
+        let mut result: BitVec<usize, Msb0> = bitvec![usize, Msb0; 0; n];
+        result.set((i + 1) % n, true);
+        let i = i as isize;
+        let n = n as isize;
+        let im1 = (i - 1).rem_euclid(n);
+        result.set(im1 as usize, true);
+        result
     }
 }

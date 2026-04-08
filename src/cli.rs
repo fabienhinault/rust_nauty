@@ -1,4 +1,3 @@
-use crate::nauty::WORDSIZE;
 use clap::Parser;
 
 #[derive(Parser, Clone)]
@@ -51,6 +50,6 @@ pub struct GengCli {
     // diff with original geng
     #[arg(long)]
     pub maxe: Option<usize>,
-    #[arg(value_parser = clap::value_parser!(u64).range(1..=(WORDSIZE as u64)))]
+    //#[arg(value_parser = clap::value_parser!(u64).range(1..=(WORDSIZE as u64)))]
     pub maxn: u64,
 }
