@@ -1,10 +1,14 @@
+use crate::{
+    MAXN,
+    graph6::BIT,
+    gtools::g6char::G6Char,
+    gtools::g6string::{G6String, graph_size},
+};
+use bitvec::{bitvec, order::Msb0, vec::BitVec};
 use std::{
     collections::HashSet,
     ops::{Index, IndexMut},
 };
-
-use crate::{MAXN, graph6::BIT, gtools::g6string::G6String};
-use bitvec::{bitvec, order::Msb0, vec::BitVec};
 
 /// From nauty.h:
 ///
@@ -53,7 +57,7 @@ const LOG_WORDSIZE: u8 = (WORDSIZE - 1).count_ones() as u8;
 // the BitVec of index i has the vertices adjascent to vertex of index i.
 // g.0[i][j] == 1 iff (i, j) is an edge of g.
 pub type SetWord = BitVec<usize, Msb0>;
-#[derive(Default)]
+#[derive(Default, PartialEq, Debug)]
 pub struct Graph(pub Vec<BitVec<usize, Msb0>>);
 pub type NautyCounter = u128;
 
@@ -117,6 +121,10 @@ impl Graph {
         Self(vec![bitvec![usize, Msb0; 0]])
     }
 
+    pub fn no_edge(vertex_count: usize) -> Self {
+        Self(vec![bitvec![usize, Msb0; 0; vertex_count]; vertex_count])
+    }
+
     pub fn n(&self) -> usize {
         self.0.len()
     }
@@ -128,9 +136,26 @@ impl Graph {
     // function ntog6 in gtools.c in nauty
     // https://users.cecs.anu.edu.au/~bdm/data/formats.txt
     pub fn to_graph6(&self) -> String {
-        let mut g6 = G6String::from(self);
-        g6.finish();
-        g6.to_string()
+        G6String::from(self).to_string()
+    }
+
+    pub(crate) fn from_graph6(g6: String) -> Result<Self, ()> {
+        let mut iter: std::slice::Iter<'_, u8> = g6.as_bytes().iter();
+        let n = graph_size(&mut iter)?;
+        let mut g = Self::no_edge(n);
+        let mut g6_char = G6Char::from(*iter.next().ok_or(())?);
+        for i_row in 1..n {
+            for i_other_vertex in 0..i_row {
+                if g6_char.is_empty() {
+                    g6_char = G6Char::from(*iter.next().ok_or(())?);
+                }
+                if g6_char.pop_front() {
+                    g.0[i_row].set(i_other_vertex, true);
+                    g.0[i_other_vertex].set(i_row, true);
+                }
+            }
+        }
+        Ok(g)
     }
 
     pub fn isconnected(&self) -> bool {
@@ -251,6 +276,7 @@ mod test {
     //         assert_eq!(1 << (63 - i_bit), bit)
     //     }
     // }
+
     // example from https://users.cecs.anu.edu.au/~bdm/data/formats.txt, line 73
     #[test]
     fn test_to_graph6() {
@@ -258,6 +284,19 @@ mod test {
         let g6 = g.to_graph6();
         assert_eq!(g6.bytes().collect::<Vec<_>>(), [68, 81, 99, 10]);
         assert_eq!(g6, "DQc\n");
+    }
+
+    // example from https://users.cecs.anu.edu.au/~bdm/data/formats.txt, line 73
+    #[test]
+    fn test_from_graph6() {
+        assert_eq!(
+            create_example(),
+            Graph::from_graph6("DQc".to_owned()).unwrap()
+        );
+        assert_eq!(
+            create_example(),
+            Graph::from_graph6("DQc\n".to_owned()).unwrap()
+        );
     }
 
     #[test]
@@ -290,8 +329,9 @@ mod test {
 
     #[test_case(create_n_path(4))]
     #[test_case(create_g4g_not_bc())]
-    #[test_case(create_a())]
+    #[test_case(create_D_7dC())]
     fn test_is_not_biconnected(not_biconnected_graph: Graph) {
+        // println!("{}", not_biconnected_graph.to_graph6());
         assert!(!not_biconnected_graph.isbiconnected());
     }
 
@@ -423,7 +463,9 @@ mod test {
     //  1-0--3
     //  |/   |
     //  2    4
-    fn create_a() -> Graph {
+    //
+    // D}C
+    fn create_D_7dC() -> Graph {
         Graph(vec![
             //                   0  1  2  3  4
             bitvec![usize, Msb0; 0, 1, 1, 1, 0],
