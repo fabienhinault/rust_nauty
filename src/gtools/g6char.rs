@@ -1,3 +1,5 @@
+use crate::gtools::g6error::G6Error;
+
 use super::g6string::BIAS6;
 
 const TOPBIT6: u8 = 32;
@@ -48,11 +50,13 @@ impl G6Char {
     }
 }
 
-impl From<u8> for G6Char {
-    fn from(value: u8) -> Self {
-        Self {
-            value_so_far: value - BIAS6,
+impl TryFrom<u8> for G6Char {
+    type Error = G6Error;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        Ok(Self {
+            value_so_far: value.checked_sub(BIAS6).ok_or(G6Error())?,
             push_left_count: 0,
-        }
+        })
     }
 }

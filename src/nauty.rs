@@ -1,12 +1,16 @@
 use crate::{
     MAXN,
     graph6::BIT,
-    gtools::g6char::G6Char,
-    gtools::g6string::{G6String, graph_size},
+    gtools::{
+        g6char::G6Char,
+        g6error::G6Error,
+        g6string::{G6String, graph_size},
+    },
 };
 use bitvec::{bitvec, order::Msb0, vec::BitVec};
 use std::{
     collections::HashSet,
+    fs::File,
     ops::{Index, IndexMut},
 };
 
@@ -51,17 +55,52 @@ use std::{
 /// *    This is  refined for the root of the tree, which has level 1.           *
 ///
 /// here WORDSIZE == size_of(usize) (64)
+///
+
+struct OptionBlk {
+    getcanon: u8,       /* make canong and canonlab? */
+    digraph: bool,      /* multiple edges or loops? */
+    writeautoms: bool,  /* write automorphisms? */
+    writemarkers: bool, /* write stats on pts fixed, etc.? */
+    defaultptn: bool,   /* set lab,ptn,active for single cell? */
+    cartesian: bool,    /* use cartesian rep for writing automs? */
+    linelength: u8,     /* max chars/line (excl. '\n') for output */
+    outfile: File,      /* file for output, if any */
+    tc_level: u8,       /* max level for smart target cell choosing */
+    mininvarlevel: u8,  /* min level for invariant computation */
+    maxinvarlevel: u8,  /* max level for invariant computation */
+    invararg: u8,       /* value passed to (*invarproc)() */
+    schreier: bool,     /* use random schreier method */  // skip for now
+}
+
+struct StatBlk {
+    grpsize1: f64,        /* size of group is */
+    grpsize2: i64,        /*    grpsize1 * 10^grpsize2 */
+    numorbits: usize,     /* number of orbits in group */
+    numgenerators: usize, /* number of generators found */
+    errstatus: u8,        /* if non-zero : an error code */
+    numnodes: usize,      /* total number of nodes */
+    numbadleaves: usize,  /* number of leaves of no use */
+    maxlevel: usize,      /* maximum depth of search */
+    tctotal: usize,       /* total size of all target cells */
+    canupdates: usize,    /* number of updates of best label */
+    invapplics: usize,    /* number of applications of invarproc */
+    invsuccesses: usize,  /* number of successful uses of invarproc() */
+    invarsuclevel: usize, /* least level where invarproc worked */
+}
+
 pub const WORDSIZE: usize = usize::BITS as usize;
 const LOG_WORDSIZE: u8 = (WORDSIZE - 1).count_ones() as u8;
+const NAUTY_INFINITY: usize = 2000000002; /* Max graph size is 2 billion */
 
 // the BitVec of index i has the vertices adjascent to vertex of index i.
 // g.0[i][j] == 1 iff (i, j) is an edge of g.
-pub type SetWord = BitVec<usize, Msb0>;
+pub type Set = BitVec<usize, Msb0>;
 #[derive(Default, PartialEq, Debug)]
 pub struct Graph(pub Vec<BitVec<usize, Msb0>>);
 pub type NautyCounter = u128;
 
-trait SetWordTrait {
+pub trait SetTrait {
     fn difference(&self, other: &Self) -> Self;
     fn first_bit_nz_index(&self) -> usize;
     fn one(index: usize) -> Self;
@@ -69,9 +108,12 @@ trait SetWordTrait {
     fn remove_one(&mut self, index: usize);
     fn except_one(&self, index: usize) -> Self;
     fn filter(&self, other: &Self) -> Self;
+    fn ones_iter(&self) -> SetIterator;
+    fn bit_mask(&self, pos: usize) -> Self;
+    fn masked(&self, pos: usize) -> Self;
 }
 
-impl SetWordTrait for SetWord {
+impl SetTrait for Set {
     fn difference(&self, other: &Self) -> Self {
         self.clone() & !other.clone()
     }
@@ -99,6 +141,38 @@ impl SetWordTrait for SetWord {
     fn filter(&self, other: &Self) -> Self {
         self.clone() & other
     }
+
+    fn ones_iter(&self) -> SetIterator {
+        SetIterator { set: self.clone() }
+    }
+
+    fn bit_mask(&self, pos: usize) -> Self {
+        let mut result = bitvec![usize, Msb0; 0; pos];
+        result.extend_from_bitslice(self[0..self.len() - pos].iter().as_bitslice());
+        result
+    }
+
+    fn masked(&self, pos: usize) -> Self {
+        self.filter(&self.bit_mask(pos))
+    }
+}
+
+pub struct SetIterator {
+    set: Set,
+}
+
+impl Iterator for SetIterator {
+    type Item = usize;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let lz = self.set.leading_zeros();
+        if lz == self.set.len() {
+            None
+        } else {
+            self.set.remove_one(lz);
+            Some(lz)
+        }
+    }
 }
 
 impl IndexMut<usize> for Graph {
@@ -108,7 +182,7 @@ impl IndexMut<usize> for Graph {
 }
 
 impl Index<usize> for Graph {
-    type Output = SetWord;
+    type Output = Set;
 
     fn index(&self, index: usize) -> &Self::Output {
         &self.0[index]
@@ -129,8 +203,12 @@ impl Graph {
         self.0.len()
     }
 
-    pub fn get(&self, i: usize) -> &SetWord {
+    pub fn get(&self, i: usize) -> &Set {
         &self.0[i]
+    }
+
+    pub fn upper(&self, i: usize) -> Set {
+        self[i].masked(i)
     }
 
     // function ntog6 in gtools.c in nauty
@@ -139,15 +217,15 @@ impl Graph {
         G6String::from(self).to_string()
     }
 
-    pub(crate) fn from_graph6(g6: String) -> Result<Self, ()> {
+    pub(crate) fn from_graph6(g6: String) -> Result<Self, G6Error> {
         let mut iter: std::slice::Iter<'_, u8> = g6.as_bytes().iter();
         let n = graph_size(&mut iter)?;
         let mut g = Self::no_edge(n);
-        let mut g6_char = G6Char::from(*iter.next().ok_or(())?);
+        let mut g6_char = G6Char::try_from(*iter.next().ok_or(G6Error())?)?;
         for i_row in 1..n {
             for i_other_vertex in 0..i_row {
                 if g6_char.is_empty() {
-                    g6_char = G6Char::from(*iter.next().ok_or(())?);
+                    g6_char = G6Char::try_from(*iter.next().ok_or(G6Error())?)?;
                 }
                 if g6_char.pop_front() {
                     g.0[i_row].set(i_other_vertex, true);
@@ -156,6 +234,10 @@ impl Graph {
             }
         }
         Ok(g)
+    }
+
+    pub fn canonise(&self) -> Self {
+        todo!()
     }
 
     pub fn isconnected(&self) -> bool {
@@ -260,8 +342,116 @@ impl VecMap {
     }
 }
 
+/*****************************************************************************
+*                                                                            *
+*  This procedure finds generators for the automorphism group of a           *
+*  vertex-coloured graph and optionally finds a canonically labelled         *
+*  isomorph.  A description of the data structures can be found in           *
+*  nauty.h and in the "nauty User's Guide".  The Guide also gives            *
+*  many more details about its use, and implementation notes.                *
+*                                                                            *
+*  Parameters - <r> means read-only, <w> means write-only, <wr> means both:  *
+*           g <r>  - the graph                                               *
+*     lab,ptn <rw> - used for the partition nest which defines the colouring *
+*                  of g.  The initial colouring will be set by the program,  *
+*                  using the same colour for every vertex, if                *
+*                  options->defaultptn!=FALSE.  Otherwise, you must set it   *
+*                  yourself (see the Guide). If options->getcanon!=FALSE,    *
+*                  the contents of lab on return give the labelling of g     *
+*                  corresponding to canong.  This does not change the        *
+*                  initial colouring of g as defined by (lab,ptn), since     *
+*                  the labelling is consistent with the colouring.           *
+*     active  <r>  - If this is not NULL and options->defaultptn==FALSE,     *
+*                  it is a set indicating the initial set of active colours. *
+*                  See the Guide for details.                                *
+*     orbits  <w>  - On return, orbits[i] contains the number of the         *
+*                  least-numbered vertex in the same orbit as i, for         *
+*                  i=0,1,...,n-1.                                            *
+*    options  <r>  - A list of options.  See nauty.h and/or the Guide        *
+*                  for details.                                              *
+*      stats  <w>  - A list of statistics produced by the procedure.  See    *
+*                  nauty.h and/or the Guide for details.                     *
+*  workspace  <w>  - A chunk of memory for working storage.                  *
+*  worksize   <r>  - The number of setwords in workspace.  See the Guide     *
+*                  for guidance.                                             *
+*          m  <r>  - The number of setwords in sets.  This must be at        *
+*                  least ceil(n / WORDSIZE) and at most MAXM.                *
+*          n  <r>  - The number of vertices.  This must be at least 1 and    *
+*                  at most MAXN.                                             *
+*     canong  <w>  - The canononically labelled isomorph of g.  This is      *
+*                  only produced if options->getcanon!=FALSE, and can be     *
+*                  given as NULL otherwise.                                  *
+*                                                                            *
+*  FUNCTIONS CALLED: firstpathnode(),updatecan()                             *
+*                                                                            *
+*****************************************************************************/
+fn nauty(
+    g_arg: Graph,
+    lab: &mut [usize],
+    ptn: &mut [usize],
+    active_arg: &[Set],
+    orbits_arg: &mut Vec<usize>,
+    options: &OptionBlk,
+    stats_arg: &mut StatBlk,
+    canong_arg: &mut Graph,
+) {
+    let n = g_arg.n();
+
+    let mut numcells: usize;
+    let mut initstatus: u8;
+
+    let defltwork: Vec<Set>;
+    let workperm: Vec<usize>;
+    let fixedpts: Vec<Set>;
+    let firstlab: Vec<usize>;
+    let canonlab: Vec<usize>;
+    let firstcode: Vec<u8>;
+    let canoncode: Vec<u8>;
+    let firsttc: Vec<usize>;
+    let mut active: Vec<Set>;
+
+    /* initialize everything: */
+    if options.defaultptn {
+        for i in 0..n {
+            lab[i] = i;
+            ptn[i] = NAUTY_INFINITY;
+        }
+        ptn[n - 1] = 0;
+        active = vec![(Set::new())];
+        active[0].add_one(0);
+        numcells = 1;
+    } else {
+        ptn[n - 1] = 0;
+        numcells = 0;
+        for i in 0..n {
+            if ptn[i] != 0 {
+                ptn[i] = NAUTY_INFINITY;
+            } else {
+                numcells += 1;
+            }
+            if active_arg.is_empty() {
+                active = vec![(Set::new())];
+                for mut i in 0..n {
+                    active[0].add_one(i);
+                    while ptn[i] != 0 {
+                        i += 1;
+                    }
+                }
+            } else {
+                active = active_arg.to_vec();
+            }
+        }
+    }
+    let mut g: Graph;
+    let mut cannong: Graph;
+    initstatus = 0;
+    for (i in 0..n) {
+        
+    }
+}
+
 #[cfg(test)]
-mod test {
+pub mod test {
 
     use super::*;
     use test_case::test_case;
@@ -384,7 +574,7 @@ mod test {
 
     //  ,---------------- ... --.
     //  0---1---2---3---4 ... --n
-    fn create_n_circle(n: usize) -> Graph {
+    pub fn create_n_circle(n: usize) -> Graph {
         Graph((0..n).map(|i| create_n_circle_bitvec(n, i)).collect())
     }
 
@@ -424,7 +614,7 @@ mod test {
         Graph((0..n).map(|i| create_complete_bitvec(n, i)).collect())
     }
 
-    fn create_complete_bitvec(n: usize, i: usize) -> SetWord {
+    fn create_complete_bitvec(n: usize, i: usize) -> Set {
         let mut result: BitVec<usize, Msb0> = bitvec![usize, Msb0; 1; n];
         result.set(i, false);
         result

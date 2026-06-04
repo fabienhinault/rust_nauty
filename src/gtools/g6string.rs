@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::nauty::Graph;
+use crate::{gtools::g6error::G6Error, nauty::Graph};
 
 use super::g6char::G6Char;
 
@@ -102,13 +102,17 @@ pub fn encode_graph_size(vertex_number: usize) -> Vec<u8> {
     }
 }
 
-fn next(iter: &mut std::slice::Iter<'_, u8>) -> Result<usize, ()> {
-    Ok((iter.next().ok_or(())?.checked_sub(BIAS6).ok_or(())?) as usize)
+fn next(iter: &mut std::slice::Iter<'_, u8>) -> Result<usize, G6Error> {
+    Ok((iter
+        .next()
+        .ok_or(G6Error())?
+        .checked_sub(BIAS6)
+        .ok_or(G6Error())?) as usize)
 }
 
 // function graphsize in gtools.c
 /* Get size of graph out of graph6, digraph6 or sparse6 string. */
-pub(crate) fn graph_size(iter: &mut std::slice::Iter<'_, u8>) -> Result<usize, ()> {
+pub(crate) fn graph_size(iter: &mut std::slice::Iter<'_, u8>) -> Result<usize, G6Error> {
     let mut n: usize = next(iter)? as usize;
     if n > SMALL_N {
         n = next(iter)?;

@@ -1,16 +1,18 @@
 use clap::Parser;
 use cli::GengCli;
 use env::Env;
-//use geng::Extender;
+use geng::Extender;
 use level_data::LevelData;
 use nauty::{Graph, WORDSIZE};
 
 pub mod cli;
 mod env;
-//mod geng;
+mod geng;
 mod graph6;
 pub mod gtools;
 mod level_data;
+mod naugraph;
+mod nautil;
 pub mod nauty;
 
 const MAXN: usize = WORDSIZE;
@@ -66,8 +68,8 @@ fn main() {
         }
         let mut data: Vec<LevelData> = LevelData::make(sparse, maxn, maxdeg);
         data[1].xbnds(&env, 1, 0, 0);
-        let xlb = data[1].xlb;
-        let xub = data[1].xub;
+        // let xlb = data[1].xlb;
+        // let xub = data[1].xub;
         // let mut extender = Extender {
         //     maxn,
         //     mindeg,

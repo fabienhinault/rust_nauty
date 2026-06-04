@@ -6,6 +6,7 @@ pub struct Extender {
     pub connec: u8,
     pub nodes: Vec<NautyCounter>,
     pub data: Vec<LevelData>,
+    pub canonise: bool,
 }
 
 impl Extender {
@@ -19,6 +20,7 @@ impl Extender {
         rigid: bool,
         xlb: usize,
         xub: usize,
+        ecount: &mut [i32],
     ) {
         let mut xlb = xlb;
 
@@ -68,7 +70,7 @@ impl Extender {
                     g,
                     n,
                     x,
-                    gx,
+                    &mut gx,
                     deg,
                     xc > dmax + 1 || (xc == dmax + 1 && (x & d) == 0),
                 ) && (self.connec == 0
@@ -78,8 +80,8 @@ impl Extender {
                     ecount[ne + xc] += 1;
                     println!(
                         "{}",
-                        if cannonise {
-                            gcan.to_graph6()
+                        if self.canonise {
+                            gx.canonise().to_graph6()
                         } else {
                             gx.to_graph6()
                         }
@@ -90,7 +92,7 @@ impl Extender {
     }
 }
 
-fn accept2(g: &mut Graph, n: usize, x: usize, gx: Graph, deg: &[usize], d: bool) -> bool {
+fn accept2(g: &mut Graph, n: usize, x: usize, gx: &mut Graph, deg: &[usize], d: bool) -> bool {
     todo!()
 }
 
