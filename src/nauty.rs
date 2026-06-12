@@ -7,9 +7,9 @@ use crate::{
         g6string::{G6String, graph_size},
     },
 };
-use bitvec::{bitvec, order::Msb0, vec::BitVec};
+use bitvec::{bitvec, order::Msb0, vec::BitVec, view::AsBits, view::BitView};
 use std::{
-    collections::HashSet,
+    collections::{HashSet, LinkedList},
     fs::File,
     ops::{Index, IndexMut},
 };
@@ -89,9 +89,39 @@ struct StatBlk {
     invarsuclevel: usize, /* least level where invarproc worked */
 }
 
+impl StatBlk {
+    fn new(numorbits: usize) -> Self {
+        Self {
+            numorbits,
+            ..Default::default()
+        }
+    }
+}
+
+impl Default for StatBlk {
+    fn default() -> Self {
+        Self {
+            grpsize1: 1.0,
+            grpsize2: 0,
+            numorbits: 0,
+            numgenerators: 0,
+            errstatus: 0,
+            numnodes: 0,
+            numbadleaves: 0,
+            maxlevel: 0,
+            tctotal: 0,
+            canupdates: 0,
+            invapplics: 0,
+            invsuccesses: 0,
+            invarsuclevel: 0,
+        }
+    }
+}
+
 pub const WORDSIZE: usize = usize::BITS as usize;
 const LOG_WORDSIZE: u8 = (WORDSIZE - 1).count_ones() as u8;
-const NAUTY_INFINITY: usize = 2000000002; /* Max graph size is 2 billion */
+pub const NAUTY_INFINITY: usize = 2_000_000_002; /* Max graph size is 2 billion */
+pub const NAUTY_INFINITY_I: isize = 2_000_000_002; /* Max graph size is 2 billion */
 
 // the BitVec of index i has the vertices adjascent to vertex of index i.
 // g.0[i][j] == 1 iff (i, j) is an edge of g.
@@ -192,7 +222,7 @@ impl Index<usize> for Graph {
 impl Graph {
     // graph with one vertex and no edge
     pub fn one() -> Self {
-        Self(vec![bitvec![usize, Msb0; 0]])
+        Self(vec![bitvec![usize, Msb0; 0; 1]])
     }
 
     pub fn no_edge(vertex_count: usize) -> Self {
@@ -234,6 +264,18 @@ impl Graph {
             }
         }
         Ok(g)
+    }
+
+    pub(crate) fn from_32(input: &[u32]) -> Self {
+        let n = input.len();
+        let mut g = Self::no_edge(n);
+        for (i_row, &i_input) in input.iter().enumerate() {
+            let bits = i_input.view_bits::<Msb0>();
+            for i_other_vertex in 0..n {
+                g.0[i_row].set(i_other_vertex, bits[i_other_vertex]);
+            }
+        }
+        g
     }
 
     pub fn canonise(&self) -> Self {
@@ -323,6 +365,7 @@ impl Graph {
     }
 }
 
+/// a dynamic associative array usize -> usize based on Vec rather than HashMap or BTreeMap
 struct VecMap(Vec<Option<usize>>);
 
 impl VecMap {
@@ -340,6 +383,23 @@ impl VecMap {
         }
         self.0[index] = Some(value);
     }
+}
+
+// static variables in nauty.c
+#[derive(Default)]
+pub struct NautyEnv {
+    /* temporary versions of some stats: */
+    pub invapplics: usize,
+    pub invsuccesses: usize,
+    pub invarsuclevel: usize,
+    pub noncheaplevel: usize, /* level of greatest ancestor for which cheapautom==FALSE */
+    pub eqlev_canon: isize,   /* level to which codes for this node match those for the bsf leaf. */
+
+    pub needshortprune: bool, /* used to flag calls to shortprune */
+
+    pub workperm: Vec<usize>,
+    pub active: Vec<Set>,
+    pub workspace: Vec<Set>, /*work area to hold automorphism data */
 }
 
 /*****************************************************************************
@@ -394,7 +454,8 @@ fn nauty(
     options: &OptionBlk,
     stats_arg: &mut StatBlk,
     canong_arg: &mut Graph,
-) {
+) -> Result<(), u8> {
+    let mut nauty_env = NautyEnv::default();
     let n = g_arg.n();
 
     let mut numcells: usize;
@@ -445,14 +506,89 @@ fn nauty(
     let mut g: Graph;
     let mut cannong: Graph;
     initstatus = 0;
-    for (i in 0..n) {
-        
-    }
+
+    let mut orbits: Vec<usize> = (0..n).collect();
+    let mut stats: StatBlk = StatBlk::new(n);
+    fixedpts = vec![];
+    nauty_env.noncheaplevel = 1;
+    nauty_env.eqlev_canon = -1;
+    nauty_env.needshortprune = false;
+    nauty_env.invarsuclevel = NAUTY_INFINITY;
+    nauty_env.invapplics = 0;
+    nauty_env.invsuccesses = 0;
+    firstpathnode0(g_arg, lab, ptn, 1, numcells, LinkedList::new(), &mut stats);
+    Ok(())
 }
 
+/*****************************************************************************
+*                                                                            *
+*  firstpathnode(lab,ptn,level,numcells) produces a node on the leftmost     *
+*  path down the tree.  The parameters describe the level and the current    *
+*  colour partition.  The set of active cells is taken from the global set   *
+*  'active'.  If the refined partition is not discrete, the leftmost child   *
+*  is produced by calling firstpathnode, and the other children by calling   *
+*  othernode.                                                                *
+*  For MAXN=0 there is an extra parameter: the address of the parent tcell   *
+*  structure.                                                                *
+*  The value returned is the level to return to.                             *
+*                                                                            *
+*  FUNCTIONS CALLED: (*usernodeproc)(),doref(),cheapautom(),                 *
+*                    firstterminal(),nextelement(),breakout(),               *
+*                    firstpathnode(),othernode(),recover(),writestats(),     *
+*                    (*userlevelproc)(),(*tcellproc)(),shortprune()          *
+*                                                                            *
+*****************************************************************************/
+fn firstpathnode0(
+    g_arg: Graph,
+    lab: &mut [usize],
+    ptn: &mut [usize],
+    level: usize,
+    numcells: usize,
+    tcnode_parent: LinkedList<Set>,
+    stats: &mut StatBlk,
+) -> Result<(), u8> {
+    let tv: usize;
+    let tv1: usize;
+    let index: usize;
+    let rtnlevel: usize;
+    let tcellsize: usize;
+    let tc: usize;
+    let childcount: usize;
+    let qinvar: usize;
+    let refcode: usize;
+    let mut tcell: &mut Set;
+    let mut tcnode_this: LinkedList<Set> = tcnode_parent;
+
+    if tcnode_this.is_empty() {
+        tcnode_this.push_back(Set::new());
+    }
+    tcell = tcnode_this.front_mut().unwrap();
+    stats.numnodes += 1;
+
+    /* refine partition : */
+    // doref(
+    //     g_arg,
+    //     lab,
+    //     ptn,
+    //     level,
+    //     &numcells,
+    //     &qinvar,
+    //     workperm,
+    //     active,
+    //     &refcode,
+    //     dispatch.refine,
+    //     invarproc,
+    //     mininvarlevel,
+    //     maxinvarlevel,
+    //     invararg,
+    //     digraph,
+    //     M,
+    //     n,
+    // );
+    Ok(())
+}
 #[cfg(test)]
 pub mod test {
-
     use super::*;
     use test_case::test_case;
 
@@ -545,6 +681,18 @@ pub mod test {
         assert!(!create_without_loop().isbiconnected());
     }
 
+    #[test]
+    fn test_create_from_32() {
+        let actual = Graph::from_32(&[1610612736, 2684354560, 3221225472]);
+        let expected = Graph(vec![
+            //                   0  1  2
+            bitvec![usize, Msb0; 0, 1, 1],
+            bitvec![usize, Msb0; 1, 0, 1],
+            bitvec![usize, Msb0; 1, 1, 0],
+        ]);
+        assert_eq!(actual, expected);
+    }
+
     // example from https://users.cecs.anu.edu.au/~bdm/data/formats.txt, line 73
     //
     //  2---0---4---3---1
@@ -600,7 +748,12 @@ pub mod test {
         Graph(words)
     }
 
-    fn create_diamond() -> Graph {
+    //   1
+    //  / \
+    // 0---2
+    //  \ /
+    //   4
+    pub fn create_diamond() -> Graph {
         Graph(vec![
             //                   0  1  2  3
             bitvec![usize, Msb0; 0, 1, 1, 1],
@@ -612,6 +765,10 @@ pub mod test {
 
     fn create_complete(n: usize) -> Graph {
         Graph((0..n).map(|i| create_complete_bitvec(n, i)).collect())
+    }
+
+    pub fn create_zero(n: usize) -> Graph {
+        Graph::no_edge(n)
     }
 
     fn create_complete_bitvec(n: usize, i: usize) -> Set {
