@@ -1,19 +1,3 @@
-use crate::{
-    MAXN,
-    graph6::BIT,
-    gtools::{
-        g6char::G6Char,
-        g6error::G6Error,
-        g6string::{G6String, graph_size},
-    },
-};
-use bitvec::{bitvec, order::Msb0, vec::BitVec, view::AsBits, view::BitView};
-use std::{
-    collections::{HashSet, LinkedList},
-    fs::File,
-    ops::{Index, IndexMut},
-};
-
 /// From nauty.h:
 ///
 /// *   Conventions and Assumptions:                                             *
@@ -54,8 +38,24 @@ use std::{
 /// *    ptn[j] <= x.  The partition at level 0 is given to nauty by the user.   *
 /// *    This is  refined for the root of the tree, which has level 1.           *
 ///
-/// here WORDSIZE == size_of(usize) (64)
-///
+/// here WORDSIZE == size_of(usize)
+use crate::{
+    graph6::BIT,
+    gtools::{
+        g6char::G6Char,
+        g6error::G6Error,
+        g6string::{G6String, graph_size},
+    },
+};
+use bitvec::{bitvec, order::Msb0, vec::BitVec, view::BitView};
+use std::fmt::Debug;
+use std::{
+    collections::LinkedList,
+    fs::File,
+    ops::{Index, IndexMut},
+};
+
+pub mod partition_nest;
 
 struct OptionBlk {
     getcanon: u8,       /* make canong and canonlab? */
@@ -266,16 +266,9 @@ impl Graph {
         Ok(g)
     }
 
-    pub(crate) fn from_32(input: &[u32]) -> Self {
+    pub(crate) fn from_u32(input: &[u32]) -> Self {
         let n = input.len();
-        let mut g = Self::no_edge(n);
-        for (i_row, &i_input) in input.iter().enumerate() {
-            let bits = i_input.view_bits::<Msb0>();
-            for i_other_vertex in 0..n {
-                g.0[i_row].set(i_other_vertex, bits[i_other_vertex]);
-            }
-        }
-        g
+        Graph(input.iter().map(|&u| u32_to_bitvec(u, n)).collect())
     }
 
     pub fn canonise(&self) -> Self {
@@ -363,6 +356,12 @@ impl Graph {
             }
         }
     }
+}
+
+pub fn u32_to_bitvec(u: u32, n: usize) -> BitVec<usize, Msb0> {
+    let mut bv: BitVec<usize, Msb0> = bitvec![usize, Msb0;];
+    bv.extend_from_bitslice(u.view_bits::<Msb0>().split_at(n).0);
+    bv
 }
 
 /// a dynamic associative array usize -> usize based on Vec rather than HashMap or BTreeMap
@@ -682,8 +681,8 @@ pub mod test {
     }
 
     #[test]
-    fn test_create_from_32() {
-        let actual = Graph::from_32(&[1610612736, 2684354560, 3221225472]);
+    fn test_create_from_u32() {
+        let actual = Graph::from_u32(&[1610612736, 2684354560, 3221225472]);
         let expected = Graph(vec![
             //                   0  1  2
             bitvec![usize, Msb0; 0, 1, 1],
