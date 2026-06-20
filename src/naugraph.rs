@@ -92,26 +92,26 @@ fn refine_nest(
         if split1 == split2 {
             gptr = &g.0[nest[split1]];
             cell2 = 0;
-            cfor! {cell1 = 0; cell1 < g.n(); cell1 = cell2 + 1; {
-                let cell2 = nest.cell_end(cell1, level);
-                if cell1 == cell2 {
+            for cell in nest.chunk_by(level) {
+                if cell.len() == 1 {
                     continue;
                 }
-                c1 = cell1;
-                c2 = cell2;
+                c1 = 0;
+                c2 = cell.len() - 1;
                 while c1 <= c2 {
-                    if gptr[nest[c1]] {
-                        c1 +=1;
+                    if gptr[cell[c1]] {
+                        c1 += 1;
                     } else {
-                        nest.swap(c1, c2);
+                        cell.swap(c1, c2);
                         c2 -= 1;
                     }
                 }
-                if c2 >= cell1 && c1 <= cell2{
+                //  cell1 <= c2 < c1 <= cell2
+                if c2 >= 0 && c1 <= cell.len() - 1 {
                     ptn[c2] = level;
                     longcode = mash(longcode, c2);
                     *numcells += 1;
-                    if active[cell1] || (c2-cell1 >= cell2-c1) {
+                    if active[cell1] || (c2 - cell1 >= cell2 - c1) {
                         active.add_one(c1);
                         if c1 == cell2 {
                             hint = c1;
@@ -123,19 +123,18 @@ fn refine_nest(
                         }
                     }
                 }
-            }}
+            }
         /* nontrivial splitting cell */
         } else {
             let mut workset: Set = Set::new();
             for i in split1..=split2 {
-                workset.add_one(lab[i]);
+                workset.add_one(nest[i]);
             }
             longcode = mash(longcode, split2 - split1 + 1);
 
-            cell2 = 0;
             cfor! {cell1 = 0; cell1 < g.n(); cell1 = cell2 + 1;
             {
-                cfor! {cell2 = cell1; ptn[cell2] > level; cell2 += 1; {}}
+                let cell2 = nest.cell_end(cell1, level);
                 if cell1 == cell2 {
                     continue;
                 }

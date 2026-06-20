@@ -1,10 +1,19 @@
 use crate::nauty::NAUTY_INFINITY;
-use std::{fmt::Debug, mem, ops::Index};
+use std::{fmt::Debug, ops::Index};
 
+/// *    A partition nest is represented by a pair (lab,ptn), where lab and ptn  *
+/// *    are int arrays.  The "partition at level x" is the partition whose      *
+/// *    cells are {lab[i],lab[i+1],...,lab[j]}, where [i,j] is a maximal        *
+/// *    subinterval of [0,n-1] such that ptn[k] > x for i <= k < j and          *
+/// *    ptn[j] <= x.  The partition at level 0 is given to nauty by the user.   *
+/// *    This is  refined for the root of the tree, which has level 1.           *
 pub struct PartitionNest {
     lab: Vec<usize>,
     ptn: Vec<usize>,
+    /// Denormalized numbers of cells at all levels.
     numcell: Vec<usize>,
+    /// Denormalized counts of vertices in cells at all levels.
+    /// count[level][i_cell] is the vertex count of cell i_cell at given level.
     count: Vec<Vec<usize>>,
 }
 
@@ -45,14 +54,17 @@ impl PartitionNest {
         }
     }
 
+    pub fn partition(&self, level: usize) -> Partition {
+        Partition { nest: self, level }
+    }
+
     pub fn partition_vec(&self, level: usize) -> Vec<&[usize]> {
         self.chunk_by(level).collect::<Vec<_>>()
     }
 
     pub fn partition_string(&self, level: usize) -> String {
         itertools::Itertools::intersperse(
-            self.partition_vec(level)
-                .into_iter()
+            self.chunk_by(level)
                 .map(|chunk| format!("{chunk:?}"))
                 .map(|s| {
                     s.strip_prefix("[")
@@ -113,14 +125,29 @@ impl Debug for PartitionNest {
     }
 }
 
+#[derive(Clone)]
 pub struct Partition<'a> {
     nest: &'a PartitionNest,
     level: usize,
 }
 
+impl<'a> Partition<'a> {
+    pub fn raw_cells(&self) -> PartitionNestChunkBy<'a> {
+        self.nest.chunk_by(self.level)
+    }
+}
+
 pub struct Cell<'a> {
     partition: &'a Partition<'a>,
     first_lab_index: usize,
+    cell_lab: &'a [usize],
+    cell_ptn: &'a [usize],
+}
+
+impl<'a> Cell<'a> {
+    pub fn is_at_end(&self) -> bool {
+        self.first_lab_index == self.partition.nest.lab.len()
+    }
 }
 
 #[must_use = "iterators are lazy and do nothing unless consumed"]
@@ -170,6 +197,56 @@ impl<'a> Iterator for PartitionNestChunkBy<'a> {
     }
 }
 
+/*
+#[must_use = "iterators are lazy and do nothing unless consumed"]
+pub struct PartitionCellsIter<'a> {
+    partition: Partition<'a>,
+    index: usize,
+}
+
+impl<'a, 'b> Iterator for PartitionCellsIter<'a> {
+    type Item = Cell<'b>;
+
+    #[inline]
+    fn next<'b>(&'b mut self) -> Option<Self::Item> {
+        if self.index == self.partition.nest.lab.len() {
+            None
+        } else {
+            let mut len = 1;
+            let ptn_iter = self.partition.nest.ptn[self.index..].iter();
+            for ptn in ptn_iter {
+                if *ptn > self.partition.level {
+                    len += 1
+                } else {
+                    break;
+                }
+            }
+            let first_lab_index = self.index;
+            self.index = self.index + len;
+            Some(Cell {
+                partition: &self.partition,
+                first_lab_index,
+                cell_lab: &self.partition.nest.lab[first_lab_index..self.index],
+                cell_ptn: &self.partition.nest.ptn[first_lab_index..self.index],
+            })
+        }
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        if self.index == self.partition.nest.lab.len() {
+            (0, Some(0))
+        } else {
+            (1, Some(self.partition.nest.lab.len() - self.index))
+        }
+    }
+
+    #[inline]
+    fn last(mut self) -> Option<Self::Item> {
+        todo!()
+    }
+}
+*/
 #[cfg(test)]
 mod test {
     use super::*;
