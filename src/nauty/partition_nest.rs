@@ -1,5 +1,8 @@
-use crate::nauty::NAUTY_INFINITY;
+use crate::nauty::{NAUTY_INFINITY};
+use partition_nest_chunk_by::PartitionNestChunkBy
 use std::{fmt::Debug, ops::Index};
+
+mod partition_nest_chunk_by;
 
 /// *    A partition nest is represented by a pair (lab,ptn), where lab and ptn  *
 /// *    are int arrays.  The "partition at level x" is the partition whose      *
@@ -47,10 +50,14 @@ impl PartitionNest {
     }
 
     pub fn chunk_by(&self, level: usize) -> PartitionNestChunkBy {
-        PartitionNestChunkBy {
-            lab_slice: &self.lab,
-            ptn_slice: &self.ptn,
+        PartitionNestChunkBy::new(&self.lab, &self.ptn, level) 
+    }
+
+    pub fn cells(&self, level: usize) -> PartitionNestCells {
+        PartitionNestCells {
+            nest: &self,
             level,
+            index: 0,
         }
     }
 
@@ -147,53 +154,6 @@ pub struct Cell<'a> {
 impl<'a> Cell<'a> {
     pub fn is_at_end(&self) -> bool {
         self.first_lab_index == self.partition.nest.lab.len()
-    }
-}
-
-#[must_use = "iterators are lazy and do nothing unless consumed"]
-pub struct PartitionNestChunkBy<'a> {
-    lab_slice: &'a [usize],
-    ptn_slice: &'a [usize],
-    level: usize,
-}
-
-impl<'a> Iterator for PartitionNestChunkBy<'a> {
-    type Item = &'a [usize];
-
-    #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.lab_slice.is_empty() {
-            None
-        } else {
-            let mut len = 1;
-            let ptn_iter = self.ptn_slice.iter();
-            for ptn in ptn_iter {
-                if *ptn > self.level {
-                    len += 1
-                } else {
-                    break;
-                }
-            }
-            let (lab_head, lab_tail) = self.lab_slice.split_at(len);
-            self.lab_slice = lab_tail;
-            let (_ptn_head, ptn_tail) = self.ptn_slice.split_at(len);
-            self.ptn_slice = ptn_tail;
-            Some(lab_head)
-        }
-    }
-
-    #[inline]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        if self.lab_slice.is_empty() {
-            (0, Some(0))
-        } else {
-            (1, Some(self.lab_slice.len()))
-        }
-    }
-
-    #[inline]
-    fn last(mut self) -> Option<Self::Item> {
-        todo!()
     }
 }
 
