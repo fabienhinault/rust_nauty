@@ -195,7 +195,7 @@ impl<'a> Cell<'a> {
 }
 
 pub struct CellMut<'a> {
-    level:
+    level: usize,
     first_lab_index: usize,
     cell_lab: &'a mut [usize],
     cell_ptn: &'a mut [usize],
@@ -257,7 +257,9 @@ impl<'a> Iterator for PartitionCellsIter<'a> {
 
 #[must_use = "iterators are lazy and do nothing unless consumed"]
 pub struct PartitionCellsIterMut<'a> {
-    partition: &'a mut Partition,
+    lab_slice: &'a mut [usize],
+    ptn_slice: &'a mut [usize],
+    level: usize,
     index: usize,
 }
 
@@ -266,13 +268,12 @@ impl<'a> Iterator for PartitionCellsIterMut<'a> {
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        if self.index == self.partition.nest.lab.len() {
+        if self.lab_slice.is_empty() {
             None
         } else {
             let mut len = 1;
-            let ptn_iter = self.partition.nest.ptn[self.index..].iter();
-            for ptn in ptn_iter {
-                if *ptn > self.partition.level {
+            for ptn in self.ptn_slice.iter() {
+                if *ptn > self.level {
                     len += 1
                 } else {
                     break;
@@ -280,21 +281,29 @@ impl<'a> Iterator for PartitionCellsIterMut<'a> {
             }
             let first_lab_index = self.index;
             self.index = self.index + len;
-            let partition: &mut Partition = mem::take(&mut self.partition);
+
+            let lab_slice: &'a mut [usize] = mem::take(&mut self.lab_slice);
+            let ptn_slice: &'a mut [usize] = mem::take(&mut self.ptn_slice);
+            let (lab_head, lab_tail) = lab_slice.split_at_mut(len);
+            self.lab_slice = lab_tail;
+            let (ptn_head, ptn_tail) = ptn_slice.split_at_mut(len);
+            self.ptn_slice = ptn_tail;
+
             Some(CellMut {
+                level: self.level,
                 first_lab_index,
-                cell_lab: &mut partition.nest.lab[first_lab_index..self.index],
-                cell_ptn: &mut partition.nest.ptn[first_lab_index..self.index],
+                cell_lab: lab_head,
+                cell_ptn: ptn_head,
             })
         }
     }
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        if self.index == self.partition.nest.lab.len() {
+        if self.lab_slice.is_empty() {
             (0, Some(0))
         } else {
-            (1, Some(self.partition.nest.lab.len() - self.index))
+            (1, Some(self.lab_slice.len()))
         }
     }
 
