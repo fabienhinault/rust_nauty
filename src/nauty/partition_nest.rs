@@ -1,8 +1,10 @@
 use crate::nauty::NAUTY_INFINITY;
 use partition_nest_chunk_by::PartitionNestChunkBy;
-use std::{fmt::Debug, ops::Index};
+use partition_nest_chunk_by_mut::PartitionNestChunkByMut;
+use std::{fmt::Debug, mem, ops::Index};
 
 mod partition_nest_chunk_by;
+mod partition_nest_chunk_by_mut;
 
 /// *    A partition nest is represented by a pair (lab,ptn), where lab and ptn  *
 /// *    are int arrays.  The "partition at level x" is the partition whose      *
@@ -10,11 +12,12 @@ mod partition_nest_chunk_by;
 /// *    subinterval of [0,n-1] such that ptn[k] > x for i <= k < j and          *
 /// *    ptn[j] <= x.  The partition at level 0 is given to nauty by the user.   *
 /// *    This is  refined for the root of the tree, which has level 1.           *
+#[derive(Default)]
 pub struct PartitionNest {
     lab: Vec<usize>,
     ptn: Vec<usize>,
     /// Denormalized numbers of cells at all levels.
-    numcell: Vec<usize>,
+    numcells: Vec<usize>,
     /// Denormalized counts of vertices in cells at all levels.
     /// count[level][i_cell] is the vertex count of cell i_cell at given level.
     count: Vec<Vec<usize>>,
@@ -26,14 +29,14 @@ impl PartitionNest {
         let mut nest = Self {
             lab,
             ptn,
-            numcell: vec![],
+            numcells: vec![],
             count: vec![],
         };
         let max_level = nest.max_level();
         if let Some(max_level) = max_level {
             for level in 0..=max_level {
                 let partition = nest.partition_vec(level);
-                nest.numcell.push(partition.len());
+                nest.numcells.push(partition.len());
                 nest.count.push(
                     nest.partition_vec(level)
                         .into_iter()
@@ -53,14 +56,11 @@ impl PartitionNest {
         PartitionNestChunkBy::new(&self.lab, &self.ptn, level)
     }
 
-    pub fn cells(&self, level: usize) -> PartitionCellsIter {
-        PartitionCellsIter {
-            partition: Partition { nest: self, level },
-            index: 0,
-        }
+    pub fn chunk_by_mut(&mut self, level: usize) -> PartitionNestChunkByMut {
+        PartitionNestChunkByMut::new(&mut self.lab, &mut self.ptn, level)
     }
 
-    pub fn partition(&self, level: usize) -> Partition {
+    pub fn partition(self, level: usize) -> Partition {
         Partition { nest: self, level }
     }
 
@@ -131,27 +131,54 @@ impl Debug for PartitionNest {
     }
 }
 
-#[derive(Clone)]
-pub struct Partition<'a> {
-    nest: &'a PartitionNest,
+#[derive(Default)]
+pub struct Partition {
+    nest: PartitionNest,
     level: usize,
 }
 
-impl<'a> Partition<'a> {
-    pub fn raw_cells(&self) -> PartitionNestChunkBy<'a> {
+impl Partition {
+    pub fn numcells(&self) -> usize {
+        self.nest.numcells[self.level]
+    }
+
+    /// last index of cell containing i for partition of given level
+    pub fn cell_end(&self, i: usize) -> usize {
+        let mut end = i;
+        while self.nest.ptn[end] > self.level {
+            end += 1;
+        }
+        end
+    }
+
+    pub fn raw_cells(&self) -> PartitionNestChunkBy {
         self.nest.chunk_by(self.level)
     }
 
-    pub fn cells(&self) -> PartitionCellsIter<'a> {
+    pub fn cells(&self) -> PartitionCellsIter {
         PartitionCellsIter {
-            partition: self.clone(),
+            partition: self,
             index: 0,
         }
     }
 }
 
+impl Index<usize> for Partition {
+    type Output = usize;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.nest.lab[index]
+    }
+}
+
+impl Default for &mut Partition {
+    fn default() -> Self {
+        todo!()
+    }
+}
+
 pub struct Cell<'a> {
-    partition: Partition<'a>,
+    partition: &'a Partition,
     first_lab_index: usize,
     cell_lab: &'a [usize],
     cell_ptn: &'a [usize],
@@ -161,11 +188,27 @@ impl<'a> Cell<'a> {
     pub fn is_at_end(&self) -> bool {
         self.first_lab_index == self.partition.nest.lab.len()
     }
+
+    pub fn len(&self) -> usize {
+        self.cell_lab.len()
+    }
+}
+
+pub struct CellMut<'a> {
+    level:
+    first_lab_index: usize,
+    cell_lab: &'a mut [usize],
+    cell_ptn: &'a mut [usize],
+}
+
+pub struct CellMove {
+    partition: Partition,
+    first_lab_index: usize,
 }
 
 #[must_use = "iterators are lazy and do nothing unless consumed"]
 pub struct PartitionCellsIter<'a> {
-    partition: Partition<'a>,
+    partition: &'a Partition,
     index: usize,
 }
 
@@ -193,6 +236,55 @@ impl<'a> Iterator for PartitionCellsIter<'a> {
                 first_lab_index,
                 cell_lab: &self.partition.nest.lab[first_lab_index..self.index],
                 cell_ptn: &self.partition.nest.ptn[first_lab_index..self.index],
+            })
+        }
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        if self.index == self.partition.nest.lab.len() {
+            (0, Some(0))
+        } else {
+            (1, Some(self.partition.nest.lab.len() - self.index))
+        }
+    }
+
+    #[inline]
+    fn last(mut self) -> Option<Self::Item> {
+        todo!()
+    }
+}
+
+#[must_use = "iterators are lazy and do nothing unless consumed"]
+pub struct PartitionCellsIterMut<'a> {
+    partition: &'a mut Partition,
+    index: usize,
+}
+
+impl<'a> Iterator for PartitionCellsIterMut<'a> {
+    type Item = CellMut<'a>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index == self.partition.nest.lab.len() {
+            None
+        } else {
+            let mut len = 1;
+            let ptn_iter = self.partition.nest.ptn[self.index..].iter();
+            for ptn in ptn_iter {
+                if *ptn > self.partition.level {
+                    len += 1
+                } else {
+                    break;
+                }
+            }
+            let first_lab_index = self.index;
+            self.index = self.index + len;
+            let partition: &mut Partition = mem::take(&mut self.partition);
+            Some(CellMut {
+                first_lab_index,
+                cell_lab: &mut partition.nest.lab[first_lab_index..self.index],
+                cell_ptn: &mut partition.nest.ptn[first_lab_index..self.index],
             })
         }
     }
