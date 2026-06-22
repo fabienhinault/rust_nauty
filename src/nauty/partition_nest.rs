@@ -1,5 +1,5 @@
-use crate::nauty::{NAUTY_INFINITY};
-use partition_nest_chunk_by::PartitionNestChunkBy
+use crate::nauty::NAUTY_INFINITY;
+use partition_nest_chunk_by::PartitionNestChunkBy;
 use std::{fmt::Debug, ops::Index};
 
 mod partition_nest_chunk_by;
@@ -50,13 +50,12 @@ impl PartitionNest {
     }
 
     pub fn chunk_by(&self, level: usize) -> PartitionNestChunkBy {
-        PartitionNestChunkBy::new(&self.lab, &self.ptn, level) 
+        PartitionNestChunkBy::new(&self.lab, &self.ptn, level)
     }
 
-    pub fn cells(&self, level: usize) -> PartitionNestCells {
-        PartitionNestCells {
-            nest: &self,
-            level,
+    pub fn cells(&self, level: usize) -> PartitionCellsIter {
+        PartitionCellsIter {
+            partition: Partition { nest: self, level },
             index: 0,
         }
     }
@@ -142,10 +141,17 @@ impl<'a> Partition<'a> {
     pub fn raw_cells(&self) -> PartitionNestChunkBy<'a> {
         self.nest.chunk_by(self.level)
     }
+
+    pub fn cells(&self) -> PartitionCellsIter<'a> {
+        PartitionCellsIter {
+            partition: self.clone(),
+            index: 0,
+        }
+    }
 }
 
 pub struct Cell<'a> {
-    partition: &'a Partition<'a>,
+    partition: Partition<'a>,
     first_lab_index: usize,
     cell_lab: &'a [usize],
     cell_ptn: &'a [usize],
@@ -157,18 +163,17 @@ impl<'a> Cell<'a> {
     }
 }
 
-/*
 #[must_use = "iterators are lazy and do nothing unless consumed"]
 pub struct PartitionCellsIter<'a> {
     partition: Partition<'a>,
     index: usize,
 }
 
-impl<'a, 'b> Iterator for PartitionCellsIter<'a> {
-    type Item = Cell<'b>;
+impl<'a> Iterator for PartitionCellsIter<'a> {
+    type Item = Cell<'a>;
 
     #[inline]
-    fn next<'b>(&'b mut self) -> Option<Self::Item> {
+    fn next(&mut self) -> Option<Self::Item> {
         if self.index == self.partition.nest.lab.len() {
             None
         } else {
@@ -184,7 +189,7 @@ impl<'a, 'b> Iterator for PartitionCellsIter<'a> {
             let first_lab_index = self.index;
             self.index = self.index + len;
             Some(Cell {
-                partition: &self.partition,
+                partition: self.partition.clone(),
                 first_lab_index,
                 cell_lab: &self.partition.nest.lab[first_lab_index..self.index],
                 cell_ptn: &self.partition.nest.ptn[first_lab_index..self.index],
@@ -206,7 +211,7 @@ impl<'a, 'b> Iterator for PartitionCellsIter<'a> {
         todo!()
     }
 }
-*/
+
 #[cfg(test)]
 mod test {
     use super::*;
