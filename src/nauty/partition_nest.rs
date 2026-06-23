@@ -1,7 +1,10 @@
 use crate::nauty::NAUTY_INFINITY;
 use partition_nest_chunk_by::PartitionNestChunkBy;
 use partition_nest_chunk_by_mut::PartitionNestChunkByMut;
-use std::{fmt::Debug, mem, ops::Index};
+use std::{
+    fmt::Debug,
+    ops::{Index, IndexMut},
+};
 
 mod partition_nest_chunk_by;
 mod partition_nest_chunk_by_mut;
@@ -18,9 +21,6 @@ pub struct PartitionNest {
     ptn: Vec<usize>,
     /// Denormalized numbers of cells at all levels.
     numcells: Vec<usize>,
-    /// Denormalized counts of vertices in cells at all levels.
-    /// count[level][i_cell] is the vertex count of cell i_cell at given level.
-    count: Vec<Vec<usize>>,
 }
 
 impl PartitionNest {
@@ -30,19 +30,12 @@ impl PartitionNest {
             lab,
             ptn,
             numcells: vec![],
-            count: vec![],
         };
         let max_level = nest.max_level();
         if let Some(max_level) = max_level {
             for level in 0..=max_level {
                 let partition = nest.partition_vec(level);
                 nest.numcells.push(partition.len());
-                nest.count.push(
-                    nest.partition_vec(level)
-                        .into_iter()
-                        .map(|cell| cell.len())
-                        .collect(),
-                );
             }
         }
         nest
@@ -161,6 +154,22 @@ impl Partition {
             index: 0,
         }
     }
+
+    pub fn cells_mut(&mut self) -> PartitionCellsIterMut {
+        PartitionCellsIterMut {
+            partition: self,
+            index: 0,
+        }
+    }
+
+    pub fn split(&mut self, i: usize) {
+        self.nest.lab[i] = self.level;
+        self.nest.numcells[self.level] += 1;
+    }
+
+    fn len(&self) -> usize {
+        self.nest.lab.len()
+    }
 }
 
 impl Index<usize> for Partition {
@@ -199,11 +208,40 @@ pub struct CellMut<'a> {
     first_lab_index: usize,
     cell_lab: &'a mut [usize],
     cell_ptn: &'a mut [usize],
+    numcells: &'a mut usize,
 }
 
-pub struct CellMove {
-    partition: Partition,
-    first_lab_index: usize,
+impl<'a> CellMut<'a> {
+    pub fn len(&self) -> usize {
+        self.cell_lab.len()
+    }
+
+    pub fn swap(&mut self, a: usize, b: usize) {
+        self.cell_lab.swap(a, b)
+    }
+
+    pub fn split(&mut self, i: usize) {
+        self.cell_lab[i] = self.level;
+        *self.numcells += 1;
+    }
+
+    pub fn partition_index(&self, i: usize) -> usize {
+        self.first_lab_index + i
+    }
+}
+
+impl<'a> Index<usize> for CellMut<'a> {
+    type Output = usize;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.cell_lab[index]
+    }
+}
+
+impl<'a> IndexMut<usize> for CellMut<'a> {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.cell_lab[index]
+    }
 }
 
 #[must_use = "iterators are lazy and do nothing unless consumed"]
@@ -257,23 +295,19 @@ impl<'a> Iterator for PartitionCellsIter<'a> {
 
 #[must_use = "iterators are lazy and do nothing unless consumed"]
 pub struct PartitionCellsIterMut<'a> {
-    lab_slice: &'a mut [usize],
-    ptn_slice: &'a mut [usize],
-    level: usize,
+    partition: &'a mut Partition,
     index: usize,
 }
 
-impl<'a> Iterator for PartitionCellsIterMut<'a> {
-    type Item = CellMut<'a>;
-
-    #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.lab_slice.is_empty() {
+// do not implement trait Iterator because of lifetime issue
+impl<'a> PartitionCellsIterMut<'a> {
+    pub fn next<'b>(&'b mut self) -> Option<CellMut<'b>> {
+        if self.index == self.partition.len() {
             None
         } else {
             let mut len = 1;
-            for ptn in self.ptn_slice.iter() {
-                if *ptn > self.level {
+            for ptn in self.partition.nest.ptn.iter() {
+                if *ptn > self.partition.level {
                     len += 1
                 } else {
                     break;
@@ -281,35 +315,18 @@ impl<'a> Iterator for PartitionCellsIterMut<'a> {
             }
             let first_lab_index = self.index;
             self.index = self.index + len;
-
-            let lab_slice: &'a mut [usize] = mem::take(&mut self.lab_slice);
-            let ptn_slice: &'a mut [usize] = mem::take(&mut self.ptn_slice);
-            let (lab_head, lab_tail) = lab_slice.split_at_mut(len);
-            self.lab_slice = lab_tail;
-            let (ptn_head, ptn_tail) = ptn_slice.split_at_mut(len);
-            self.ptn_slice = ptn_tail;
-
+            let lab_slice: &'b mut [usize] =
+                &mut self.partition.nest.lab[first_lab_index..self.index];
+            let ptn_slice: &'b mut [usize] =
+                &mut self.partition.nest.ptn[first_lab_index..self.index];
             Some(CellMut {
-                level: self.level,
+                level: self.partition.level,
                 first_lab_index,
-                cell_lab: lab_head,
-                cell_ptn: ptn_head,
+                cell_lab: lab_slice,
+                cell_ptn: ptn_slice,
+                numcells: &mut self.partition.nest.numcells[self.partition.level],
             })
         }
-    }
-
-    #[inline]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        if self.lab_slice.is_empty() {
-            (0, Some(0))
-        } else {
-            (1, Some(self.lab_slice.len()))
-        }
-    }
-
-    #[inline]
-    fn last(mut self) -> Option<Self::Item> {
-        todo!()
     }
 }
 

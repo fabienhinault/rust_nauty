@@ -1,6 +1,9 @@
 use crate::{
     nautil::SetWordNautilTrait,
-    nauty::{Graph, NautyEnv, Set, SetTrait, partition_nest::PartitionNest},
+    nauty::{
+        Graph, NautyEnv, Set, SetTrait,
+        partition_nest::{Partition, PartitionNest},
+    },
 };
 use cfor::cfor;
 use core::num;
@@ -42,21 +45,16 @@ fn is_autom(g: &Graph, perm: &[usize]) -> bool {
 
 fn refine_nest(
     g: &mut Graph,
-    nest: &mut PartitionNest,
-    level: usize,
-    numcells: &mut usize,
-    count: &mut Vec<usize>,
+    partition: &mut Partition,
     active: &mut Set,
+    count: &mut [usize],
     code: &mut usize,
 ) {
     let mut i: usize;
     let mut c1: usize;
     let mut c2: usize;
-    let mut labc1: usize;
     let mut split1: usize;
     let mut split2: usize;
-    let mut cell1: usize;
-    let mut cell2: usize;
     let mut cnt: usize;
     let mut bmin: usize;
     let mut bmax: usize;
@@ -69,10 +67,10 @@ fn refine_nest(
     let workperm: Vec<usize> = Vec::with_capacity(g.n());
     let mut bucket: Vec<usize> = Vec::with_capacity(g.n() + 2);
 
-    longcode = *numcells;
+    longcode = partition.numcells();
     hint = 0;
     loop {
-        if *numcells == g.n() {
+        if partition.numcells() == g.n() {
             break;
         }
         split1 = hint;
@@ -86,13 +84,13 @@ fn refine_nest(
             }
         }
         active.remove_one(split1);
-        split2 = nest.cell_end(split1, level);
+        split2 = partition.cell_end(split1);
         longcode = mash(longcode, split1 + split2);
         /* trivial splitting cell */
         if split1 == split2 {
-            gptr = &g.0[nest[split1]];
-            cell2 = 0;
-            for cell in nest.chunk_by(level) {
+            gptr = &g.0[partition[split1]];
+            let mut cells = partition.cells_mut();
+            while let Some(mut cell) = cells.next() {
                 if cell.len() == 1 {
                     continue;
                 }
@@ -107,19 +105,18 @@ fn refine_nest(
                     }
                 }
                 //  cell1 <= c2 < c1 <= cell2
-                if c2 >= 0 && c1 <= cell.len() - 1 {
-                    ptn[c2] = level;
+                if c1 < cell.len() {
+                    cell.split(c2);
                     longcode = mash(longcode, c2);
-                    *numcells += 1;
-                    if active[cell1] || (c2 - cell1 >= cell2 - c1) {
-                        active.add_one(c1);
-                        if c1 == cell2 {
+                    if active[cell.partition_index(c1)] || (c2 >= cell.len() - 1 - c1) {
+                        active.add_one(cell.partition_index(c1));
+                        if c1 == cell.len() - 1 {
                             hint = c1;
                         }
                     } else {
-                        active.add_one(cell1);
-                        if c2 == cell1 {
-                            hint = cell1;
+                        active.add_one(cell.partition_index(0));
+                        if c2 == 0 {
+                            hint = cell.partition_index(0);
                         }
                     }
                 }
@@ -128,24 +125,22 @@ fn refine_nest(
         } else {
             let mut workset: Set = Set::new();
             for i in split1..=split2 {
-                workset.add_one(nest[i]);
+                workset.add_one(partition[i]);
             }
             longcode = mash(longcode, split2 - split1 + 1);
-
-            cfor! {cell1 = 0; cell1 < g.n(); cell1 = cell2 + 1;
-            {
-                let cell2 = nest.cell_end(cell1, level);
-                if cell1 == cell2 {
+            let mut cells = partition.cells_mut();
+            while let Some(mut cell) = cells.next() {
+                if cell.len() == 1 {
                     continue;
                 }
-                i = cell1;
-                cnt = (workset.clone() & g.0[lab[i]].clone()).count_ones();
+                i = 0;
+                cnt = (workset.clone() & g.0[cell[i]].clone()).count_ones();
                 count[i] = cnt;
                 bmin = cnt;
                 bmax = cnt;
                 bucket[cnt] = 1;
-                for i in (cell1 + 1)..=cell2 {
-                    cnt = (workset.clone() & g.0[lab[i]].clone()).count_ones();
+                for i in 1..cell.len() {
+                    cnt = (workset.clone() & g.0[cell[i]].clone()).count_ones();
                     while bmin > cnt {
                         bmin -= 1;
                         bucket[bmin] = 0;
@@ -157,49 +152,46 @@ fn refine_nest(
                     bucket[cnt] += 1;
                     count[i] = cnt;
                 }
-                if bmin == bmax
-                {
-                    longcode = mash(longcode,bmin+cell1);
+                if bmin == bmax {
+                    longcode = mash(longcode, bmin + cell.partition_index(0));
                     continue;
                 }
-                c1 = cell1;
+                c1 = 0;
                 maxcell = -1;
                 for i in (bmin + 1)..=bmax {
                     if bucket[i] != 0 {
                         c2 = c1 + bucket[i];
                         bucket[i] = c1;
-                        longcode = mash(longcode,i+c1);
+                        longcode = mash(longcode, i + c1);
                         if (c2 - c1) as isize > maxcell {
                             maxcell = (c2 - c1) as isize;
                             maxpos = Some(c1);
                         }
-                        if c1 != cell1 {
+                        if c1 != 0 {
                             active.add_one(c1);
                             if c2 - c1 == 1 {
                                 hint = c1;
                             }
-                            *numcells += 1;
                         }
-                        if c2 <= cell2 {
-                            ptn[c2 - 1] = level;
+                        if c2 < cell.len() {
+                            cell.split(c2 - 1);
                             c1 = c2;
                         }
                     }
                 }
-                for i in (cell1+1)..=cell2 {
-                    lab[i] = workperm[i];
+                for i in 1..cell.len() {
+                    cell[i] = workperm[i];
                 }
-                if !active[cell1] {
-                    active.add_one(cell1);
+                if !active[cell.partition_index(0)] {
+                    active.add_one(cell.partition_index(0));
                     if let Some(maxpos) = maxpos {
                         active.remove_one(maxpos);
                     }
                 }
-
-            }}
+            }
         }
     }
-    longcode = mash(longcode, *numcells);
+    longcode = mash(longcode, partition.numcells());
     *code = cleanup(longcode);
 }
 
