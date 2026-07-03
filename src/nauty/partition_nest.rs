@@ -15,7 +15,7 @@ mod partition_nest_chunk_by_mut;
 /// *    subinterval of [0,n-1] such that ptn[k] > x for i <= k < j and          *
 /// *    ptn[j] <= x.  The partition at level 0 is given to nauty by the user.   *
 /// *    This is  refined for the root of the tree, which has level 1.           *
-#[derive(Default)]
+#[derive(Default, PartialEq)]
 pub struct PartitionNest {
     lab: Vec<usize>,
     ptn: Vec<usize>,
@@ -124,13 +124,17 @@ impl Debug for PartitionNest {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, PartialEq, Debug)]
 pub struct Partition {
     nest: PartitionNest,
     level: usize,
 }
 
 impl Partition {
+    pub fn new(nest: PartitionNest, level: usize) -> Self {
+        Self { nest, level }
+    }
+
     pub fn numcells(&self) -> usize {
         self.nest.numcells[self.level]
     }

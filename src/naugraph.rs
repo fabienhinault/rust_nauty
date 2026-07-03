@@ -46,8 +46,8 @@ fn is_autom(g: &Graph, perm: &[usize]) -> bool {
 fn refine_nest(
     g: &mut Graph,
     partition: &mut Partition,
-    active: &mut Set,
     count: &mut [usize],
+    active: &mut Set,
     code: &mut usize,
 ) {
     let mut i: usize;
@@ -358,9 +358,7 @@ fn refine(
                         }
                     }
                 }
-                for i in (cell1+1)..=cell2 {
-                    lab[i] = workperm[i];
-                }
+                lab[(cell1 + 1)..(cell2 + 1)].copy_from_slice(&workperm[(cell1 + 1)..(cell2 + 1)]);
                 if !active[cell1] {
                     active.add_one(cell1);
                     if let Some(maxpos) = maxpos {
@@ -383,7 +381,8 @@ mod test {
         test::{create_diamond, create_n_circle, create_zero},
         u32_to_bitvec,
     };
-    use bitvec::{bitvec, order::Msb0};
+    use bitvec::{bitvec, order::Msb0, vec::BitVec};
+    use test_case::test_case;
 
     #[test]
     fn test_is_autom() {
@@ -649,7 +648,7 @@ mod test {
         );
         assert_eq!(lab, [1, 0, 3, 2]);
         assert_eq!(ptn, [2, 3, NAUTY_INFINITY, 0]);
-        assert_eq!(numcells, 4);
+        assert_eq!(numcells, 3);
         assert_eq!(count, [0, 2, 1]);
         assert_eq!(active, bitvec![usize, Msb0; 0; 4]);
         assert_eq!(code, 64);
@@ -686,10 +685,10 @@ mod test {
     fn test_5_0() {
         let mut g = Graph::from_u32(&[805306368, 402653184, 2281701376, 3221225472, 1610612736]);
         let mut lab = [0, 2, 3, 1, 4];
-        let mut ptn = [2, NAUTY_INFINITY, 2, NAUTY_INFINITY, 0];
-        let mut numcells = 3;
-        let mut count = vec![3, 2, 1];
-        let mut active: bitvec::prelude::BitVec<usize, Msb0> = u32_to_bitvec(0, 5);
+        let mut ptn = [3, 3, 2, NAUTY_INFINITY, 0];
+        let mut numcells = 4;
+        let mut count = vec![3, 1, 1];
+        let mut active: bitvec::prelude::BitVec<usize, Msb0> = u32_to_bitvec(1073741824, 5);
         let mut code: usize = 21845;
         refine(
             &mut g,
@@ -701,58 +700,44 @@ mod test {
             &mut active,
             &mut code,
         );
-        assert_eq!(lab, [1, 0, 2, 3, 4]);
-        assert_eq!(ptn, [2, NAUTY_INFINITY, 2, NAUTY_INFINITY, 0]);
-        assert_eq!(numcells, 3);
+        assert_eq!(lab, [0, 2, 3, 4, 1]);
+        assert_eq!(ptn, [3, 3, 2, 3, 0]);
+        assert_eq!(numcells, 5);
         assert_eq!(count, [3, 1, 1]);
-        assert_eq!(active, bitvec![usize, Msb0; 0; 4]);
-        assert_eq!(code, 27427);
+        assert_eq!(active, u32_to_bitvec(134217728, 5));
+        assert_eq!(code, 27417);
     }
 
     #[test]
     fn test_refine_diamond_unpartitioned_nest() {
         let mut g = create_diamond();
-        let mut lab = [0, 1, 2, 3];
-        let mut ptn = [1, 1, 1, 1, 0];
-        let mut nest = PartitionNest::new(Vec::from_iter(lab), Vec::from_iter(ptn));
+        let lab = [0, 1, 2, 3];
+        let ptn = [1, 1, 1, 1, 0];
+        let nest = PartitionNest::new(Vec::from_iter(lab), Vec::from_iter(ptn));
+        let mut partition = Partition::new(nest, 0);
         let mut count = vec![4];
-        let mut numcells = 1;
+        assert_eq!(partition.numcells(), 1);
         let mut active = bitvec![usize, Msb0; 1; 4];
         let mut code: usize = 0;
-        refine_nest(
-            &mut g,
-            &mut nest,
-            0,
-            &mut numcells,
-            &mut count,
-            &mut active,
-            &mut code,
-        );
+        refine_nest(&mut g, &mut partition, &mut count, &mut active, &mut code);
     }
 
     #[test]
     fn test_3_0_nest() {
         let mut g = create_zero(3);
-        let mut lab = [0, 2, 1];
-        let mut ptn = [2, NAUTY_INFINITY, 0];
-        let mut nest = PartitionNest::new(Vec::from_iter(lab), Vec::from_iter(ptn));
+        let lab = [0, 2, 1];
+        let ptn = [2, NAUTY_INFINITY, 0];
+        let nest = PartitionNest::new(Vec::from_iter(lab), Vec::from_iter(ptn));
+        let mut partition = Partition::new(nest, 2);
+        assert_eq!(partition.numcells(), 2);
         let mut count = vec![1, 0];
-        let mut numcells = 2;
         let mut active = bitvec![usize, Msb0; 1, 0, 0];
         let mut code: usize = 21845;
-        refine_nest(
-            &mut g,
-            &mut nest,
-            2,
-            &mut numcells,
-            &mut count,
-            &mut active,
-            &mut code,
-        );
+        refine_nest(&mut g, &mut partition, &mut count, &mut active, &mut code);
         assert_eq!(lab, [0, 1, 2]);
         assert_eq!(ptn, [2, NAUTY_INFINITY, 0]);
         assert_eq!(count, [1, 0]);
-        assert_eq!(numcells, 2);
+        assert_eq!(partition.numcells(), 2);
         assert_eq!(active, bitvec![usize, Msb0; 0; 3]);
         assert_eq!(code, 4);
     }
@@ -763,23 +748,16 @@ mod test {
         let mut lab = [1, 0, 2];
         let mut ptn = [2, NAUTY_INFINITY, 0];
         let mut nest = PartitionNest::new(Vec::from_iter(lab), Vec::from_iter(ptn));
-        let mut numcells = 2;
+        let mut partition = Partition::new(nest, 2);
+        assert_eq!(partition.numcells(), 2);
         let mut count = vec![0, 2];
         let mut active: bitvec::prelude::BitVec<usize, Msb0> = bitvec![usize, Msb0; 1, 0, 0];
         let mut code: usize = 1431812424;
-        refine_nest(
-            &mut g,
-            &mut nest,
-            2,
-            &mut numcells,
-            &mut count,
-            &mut active,
-            &mut code,
-        );
+        refine_nest(&mut g, &mut partition, &mut count, &mut active, &mut code);
         assert_eq!(lab, [1, 2, 0]);
         assert_eq!(ptn, [2, NAUTY_INFINITY, 0]);
         assert_eq!(count, [0, 2]);
-        assert_eq!(numcells, 2);
+        assert_eq!(partition.numcells(), 2);
         assert_eq!(active, bitvec![usize, Msb0; 0; 3]);
         assert_eq!(code, 4);
     }
@@ -790,23 +768,16 @@ mod test {
         let mut lab = [0, 2, 1];
         let mut ptn = [2, NAUTY_INFINITY, 0];
         let mut nest = PartitionNest::new(Vec::from_iter(lab), Vec::from_iter(ptn));
-        let mut numcells = 2;
+        let mut partition = Partition::new(nest, 2);
+        assert_eq!(partition.numcells(), 2);
         let mut count = vec![1, 0];
         let mut active: bitvec::prelude::BitVec<usize, Msb0> = bitvec![usize, Msb0; 1, 0, 0];
         let mut code: usize = 21845;
-        refine_nest(
-            &mut g,
-            &mut nest,
-            2,
-            &mut numcells,
-            &mut count,
-            &mut active,
-            &mut code,
-        );
+        refine_nest(&mut g, &mut partition, &mut count, &mut active, &mut code);
         assert_eq!(lab, [0, 2, 1]);
         assert_eq!(ptn, [2, NAUTY_INFINITY, 0]);
         assert_eq!(count, [1, 0]);
-        assert_eq!(numcells, 2);
+        assert_eq!(partition.numcells(), 2);
         assert_eq!(active, bitvec![usize, Msb0; 0; 3]);
         assert_eq!(code, 4);
     }
@@ -817,213 +788,54 @@ mod test {
         let mut lab = [1, 0, 2];
         let mut ptn = [2, NAUTY_INFINITY, 0];
         let mut nest = PartitionNest::new(Vec::from_iter(lab), Vec::from_iter(ptn));
-        let mut numcells = 2;
+        let mut partition = Partition::new(nest, 2);
+        assert_eq!(partition.numcells(), 2);
         let mut count = vec![0, 2];
         let mut active: bitvec::prelude::BitVec<usize, Msb0> = bitvec![usize, Msb0; 1, 0, 0];
         let mut code: usize = 1431812424;
-        refine_nest(
-            &mut g,
-            &mut nest,
-            2,
-            &mut numcells,
-            &mut count,
-            &mut active,
-            &mut code,
-        );
+        refine_nest(&mut g, &mut partition, &mut count, &mut active, &mut code);
         assert_eq!(lab, [1, 0, 2]);
         assert_eq!(ptn, [2, NAUTY_INFINITY, 0]);
         assert_eq!(count, [0, 2]);
-        assert_eq!(numcells, 2);
+        assert_eq!(partition.numcells(), 2);
         assert_eq!(active, bitvec![usize, Msb0; 0; 3]);
         assert_eq!(code, 4);
     }
 
-    #[test]
-    fn test_4_0_nest() {
-        let mut g = Graph::no_edge(4);
-        let mut lab = [0, 3, 2, 1];
-        let mut ptn = [2, NAUTY_INFINITY, NAUTY_INFINITY, 0];
-        let mut nest = PartitionNest::new(Vec::from_iter(lab), Vec::from_iter(ptn));
-        let mut numcells = 2;
-        let mut count = vec![1, 0];
-        let mut active: bitvec::prelude::BitVec<usize, Msb0> = bitvec![usize, Msb0; 1, 0, 0, 0];
-        let mut code: usize = 21845;
-        refine_nest(
-            &mut g,
-            &mut nest,
-            2,
-            &mut numcells,
-            &mut count,
-            &mut active,
-            &mut code,
-        );
-        assert_eq!(lab, [0, 2, 1, 3]);
-        assert_eq!(ptn, [2, NAUTY_INFINITY, NAUTY_INFINITY, 0]);
-        assert_eq!(numcells, 2);
-        assert_eq!(count, [1, 0]);
-        assert_eq!(active, bitvec![usize, Msb0; 0; 4]);
-        assert_eq!(code, 4);
-    }
-
-    #[test]
-    fn test_4_1_nest() {
-        let mut g = Graph::no_edge(4);
-        let mut lab = [0, 1, 2, 3];
-        let mut ptn = [2, 3, NAUTY_INFINITY, 0];
-        let mut nest = PartitionNest::new(Vec::from_iter(lab), Vec::from_iter(ptn));
-        let mut numcells = 3;
-        let mut count = vec![1, 0, 2];
-        let mut active = u32_to_bitvec(1073741824, 4);
-        let mut code: usize = 21845;
-        refine_nest(
-            &mut g,
-            &mut nest,
-            3,
-            &mut numcells,
-            &mut count,
-            &mut active,
-            &mut code,
-        );
-        assert_eq!(lab, [0, 1, 3, 2]);
-        assert_eq!(ptn, [2, 3, NAUTY_INFINITY, 0]);
-        assert_eq!(numcells, 3);
-        assert_eq!(count, [1, 0, 2]);
-        assert_eq!(active, bitvec![usize, Msb0; 0; 4]);
-        assert_eq!(code, 64);
-    }
-
-    #[test]
-    fn test_4_2_nest() {
-        let mut g = Graph::no_edge(4);
-        let mut lab = [0, 2, 1, 3];
-        let mut ptn = [2, 3, NAUTY_INFINITY, 0];
-        let mut nest = PartitionNest::new(Vec::from_iter(lab), Vec::from_iter(ptn));
-        let mut numcells = 3;
-        let mut count = vec![0, 1, 3];
-        let mut active: bitvec::prelude::BitVec<usize, Msb0> = u32_to_bitvec(1073741824, 4);
-        let mut code: usize = 1431812424;
-        refine_nest(
-            &mut g,
-            &mut nest,
-            3,
-            &mut numcells,
-            &mut count,
-            &mut active,
-            &mut code,
-        );
-        assert_eq!(lab, [0, 2, 3, 1]);
-        assert_eq!(ptn, [2, 3, NAUTY_INFINITY, 0]);
-        assert_eq!(numcells, 3);
-        assert_eq!(count, [0, 1, 3]);
-        assert_eq!(active, bitvec![usize, Msb0; 0; 4]);
-        assert_eq!(code, 64);
-    }
-
-    #[test]
-    fn test_4_3_nest() {
-        let mut g = Graph::no_edge(4);
-        let mut lab = [1, 0, 2, 3];
-        let mut ptn = [2, NAUTY_INFINITY, NAUTY_INFINITY, 0];
-        let mut nest = PartitionNest::new(Vec::from_iter(lab), Vec::from_iter(ptn));
-        let mut numcells = 2;
-        let mut count = vec![0, 2];
-        let mut active: bitvec::prelude::BitVec<usize, Msb0> = u32_to_bitvec(2147483648, 4);
-        let mut code: usize = 1431812424;
-        refine_nest(
-            &mut g,
-            &mut nest,
-            3,
-            &mut numcells,
-            &mut count,
-            &mut active,
-            &mut code,
-        );
-        assert_eq!(lab, [1, 2, 3, 0]);
-        assert_eq!(ptn, [2, NAUTY_INFINITY, NAUTY_INFINITY, 0]);
-        assert_eq!(numcells, 2);
-        assert_eq!(count, [0, 2]);
-        assert_eq!(active, bitvec![usize, Msb0; 0; 4]);
-        assert_eq!(code, 4);
-    }
-
-    #[test]
-    fn test_4_4_nest() {
-        let mut g = Graph::no_edge(4);
-        let mut lab = [1, 0, 2, 3];
-        let mut ptn = [2, 3, NAUTY_INFINITY, 0];
-        let mut nest = PartitionNest::new(Vec::from_iter(lab), Vec::from_iter(ptn));
-        let mut numcells = 3;
-        let mut count = vec![0, 2, 1];
-        let mut active: bitvec::prelude::BitVec<usize, Msb0> = u32_to_bitvec(1073741824, 4);
-        let mut code: usize = 1431812424;
-        refine_nest(
-            &mut g,
-            &mut nest,
-            3,
-            &mut numcells,
-            &mut count,
-            &mut active,
-            &mut code,
-        );
-        assert_eq!(lab, [1, 0, 3, 2]);
-        assert_eq!(ptn, [2, 3, NAUTY_INFINITY, 0]);
-        assert_eq!(numcells, 4);
-        assert_eq!(count, [0, 2, 1]);
-        assert_eq!(active, bitvec![usize, Msb0; 0; 4]);
-        assert_eq!(code, 64);
-    }
-
-    #[test]
-    fn test_4_5_nest() {
-        let mut g = Graph::from_u32(&[1879048192, 2952790016, 3489660928, 3758096384]);
-        let mut lab = [1, 0, 2, 3];
-        let mut ptn = [2, 3, NAUTY_INFINITY, 0];
-        let mut nest = PartitionNest::new(Vec::from_iter(lab), Vec::from_iter(ptn));
-        let mut numcells = 3;
-        let mut count = vec![0, 2, 1];
-        let mut active: bitvec::prelude::BitVec<usize, Msb0> = u32_to_bitvec(1073741824, 4);
-        let mut code: usize = 1431812424;
-        refine_nest(
-            &mut g,
-            &mut nest,
-            3,
-            &mut numcells,
-            &mut count,
-            &mut active,
-            &mut code,
-        );
-        assert_eq!(lab, [1, 0, 2, 3]);
-        assert_eq!(ptn, [2, 3, NAUTY_INFINITY, 0]);
-        assert_eq!(numcells, 3);
-        assert_eq!(count, [0, 2, 1]);
-        assert_eq!(active, bitvec![usize, Msb0; 0; 4]);
-        assert_eq!(code, 64);
-    }
-
-    #[test]
-    fn test_5_0_nest() {
-        let mut g = Graph::from_u32(&[805306368, 402653184, 2281701376, 3221225472, 1610612736]);
-        let mut lab = [0, 2, 3, 1, 4];
-        let mut ptn = [2, NAUTY_INFINITY, 2, NAUTY_INFINITY, 0];
-        let mut nest = PartitionNest::new(Vec::from_iter(lab), Vec::from_iter(ptn));
-        let mut numcells = 3;
-        let mut count = vec![3, 2, 1];
-        let mut active: bitvec::prelude::BitVec<usize, Msb0> = u32_to_bitvec(0, 5);
-        let mut code: usize = 21845;
-        refine_nest(
-            &mut g,
-            &mut nest,
-            3,
-            &mut numcells,
-            &mut count,
-            &mut active,
-            &mut code,
-        );
-        assert_eq!(lab, [1, 0, 2, 3, 4]);
-        assert_eq!(ptn, [2, NAUTY_INFINITY, 2, NAUTY_INFINITY, 0]);
-        assert_eq!(numcells, 3);
-        assert_eq!(count, [3, 1, 1]);
-        assert_eq!(active, bitvec![usize, Msb0; 0; 4]);
-        assert_eq!(code, 27427);
+    #[test_case(Graph::no_edge(4), &[0, 3, 2, 1], &[2, NAUTY_INFINITY, NAUTY_INFINITY, 0], 2, 2, &[1, 0], bitvec![usize, Msb0; 1, 0, 0, 0], 21845, &[0, 2, 1, 3], &[2, NAUTY_INFINITY, NAUTY_INFINITY, 0], 2, &[1, 0], bitvec![usize, Msb0; 0; 4], 4)]
+    #[test_case(Graph::from_u32(&[805306368, 402653184, 2281701376, 3221225472, 1610612736]), &[0, 2, 3, 1, 4], &[2, NAUTY_INFINITY, 2, NAUTY_INFINITY, 0], 3, 3, &[0, 2, 1], u32_to_bitvec(0, 5), 21845, &[1, 0, 2, 3, 4], &[2, NAUTY_INFINITY, 2, NAUTY_INFINITY, 0], 3, &[3, 1, 1], bitvec![usize, Msb0; 0; 5], 27427)]
+    #[test_case(Graph::from_u32(&[1879048192, 2952790016, 3489660928, 3758096384]), &[1, 0, 2, 3], &[2, 3, NAUTY_INFINITY, 0], 3, 3, &[0, 2, 1], u32_to_bitvec(1073741824, 4), 1431812424, &[1, 0, 2, 3], &[2, 3, NAUTY_INFINITY, 0], 3, &[0, 2, 1], bitvec![usize, Msb0; 0; 4], 64)]
+    #[test_case(Graph::no_edge(4), &[1, 0, 2, 3], &[2, 3, NAUTY_INFINITY, 0], 3, 3, &[0, 2, 1], u32_to_bitvec(1073741824, 4), 1431812424, &[1, 0, 3, 2], &[2, 3, NAUTY_INFINITY, 0], 4, &[0, 2, 1], bitvec![usize, Msb0; 0; 4], 64)]
+    #[test_case(Graph::no_edge(4), &[1, 0, 2, 3], &[2, NAUTY_INFINITY, NAUTY_INFINITY, 0], 3, 2, &[0, 2], u32_to_bitvec(2147483648, 4), 1431812424, &[1, 2, 3, 0], &[2, NAUTY_INFINITY, NAUTY_INFINITY, 0], 2, &[0, 2], bitvec![usize, Msb0; 0; 4], 4)]
+    #[test_case(Graph::no_edge(4), &[0, 2, 1, 3], &[2, 3, NAUTY_INFINITY, 0], 3, 3, &[0, 1, 3], u32_to_bitvec(1073741824, 4), 1431812424, &[0, 2, 3, 1], &[2, 3, NAUTY_INFINITY, 0], 3, &[0, 1, 3], bitvec![usize, Msb0; 0; 4], 64)]
+    #[test_case(Graph::no_edge(4), &[0, 1, 2, 3], &[2, 3, NAUTY_INFINITY, 0], 3, 3, &[1, 0, 2], u32_to_bitvec(1073741824, 4), 21845, &[0, 1, 3, 2], &[2, 3, NAUTY_INFINITY, 0], 3, &[1, 0, 2], bitvec![usize, Msb0; 0; 4], 64)]
+    fn test_nest(
+        mut g: Graph,
+        lab: &[usize],
+        ptn: &[usize],
+        level: usize,
+        expected_numcells_before: usize,
+        count: &[usize],
+        mut active: BitVec<usize, Msb0>,
+        mut code: usize,
+        expected_lab: &[usize],
+        expected_ptn: &[usize],
+        expected_numcells_after: usize,
+        expected_count: &[usize],
+        expected_active: BitVec<usize, Msb0>,
+        expected_code: usize,
+    ) {
+        let nest = PartitionNest::new(lab.to_vec(), ptn.to_vec());
+        let mut partition = Partition::new(nest, level);
+        assert_eq!(partition.numcells(), expected_numcells_before);
+        let mut count = count.to_vec();
+        refine_nest(&mut g, &mut partition, &mut count, &mut active, &mut code);
+        let expected_nest = PartitionNest::new(expected_lab.to_vec(), expected_ptn.to_vec());
+        let expected_partition = Partition::new(expected_nest, level);
+        assert_eq!(partition, expected_partition);
+        assert_eq!(partition.numcells(), expected_numcells_after);
+        assert_eq!(count, expected_count);
+        assert_eq!(active, expected_active);
+        assert_eq!(code, expected_code);
     }
 }
