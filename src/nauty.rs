@@ -591,6 +591,14 @@ pub mod test {
     use super::*;
     use test_case::test_case;
 
+    #[test]
+    fn test_bitvec() {
+        let bv = bitvec![usize, Msb0; 1, 0, 0];
+        assert!(bv[0]);
+        assert!(!bv[1]);
+        assert!(!bv[2]);
+    }
+
     // #[test]
     // fn test_bit() {
     //     // for i in 0.. 10000 {

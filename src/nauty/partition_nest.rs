@@ -272,9 +272,9 @@ impl<'a> Iterator for PartitionCellsIter<'a> {
                 }
             }
             let first_lab_index = self.index;
-            self.index = self.index + len;
+            self.index += len;
             Some(Cell {
-                partition: self.partition.clone(),
+                partition: self.partition,
                 first_lab_index,
                 cell_lab: &self.partition.nest.lab[first_lab_index..self.index],
                 cell_ptn: &self.partition.nest.ptn[first_lab_index..self.index],
@@ -292,7 +292,7 @@ impl<'a> Iterator for PartitionCellsIter<'a> {
     }
 
     #[inline]
-    fn last(mut self) -> Option<Self::Item> {
+    fn last(self) -> Option<Self::Item> {
         todo!()
     }
 }
@@ -310,7 +310,7 @@ impl<'a> PartitionCellsIterMut<'a> {
             None
         } else {
             let mut len = 1;
-            for ptn in self.partition.nest.ptn.iter() {
+            for ptn in self.partition.nest.ptn[self.index..].iter() {
                 if *ptn > self.partition.level {
                     len += 1
                 } else {
@@ -318,7 +318,7 @@ impl<'a> PartitionCellsIterMut<'a> {
                 }
             }
             let first_lab_index = self.index;
-            self.index = self.index + len;
+            self.index += len;
             let lab_slice: &'b mut [usize] =
                 &mut self.partition.nest.lab[first_lab_index..self.index];
             let ptn_slice: &'b mut [usize] =
