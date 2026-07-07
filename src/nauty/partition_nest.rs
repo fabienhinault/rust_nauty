@@ -220,12 +220,17 @@ impl<'a> CellMut<'a> {
         self.cell_lab.len()
     }
 
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.cell_lab.is_empty()
+    }
+
     pub fn swap(&mut self, a: usize, b: usize) {
         self.cell_lab.swap(a, b)
     }
 
     pub fn split(&mut self, i: usize) {
-        self.cell_lab[i] = self.level;
+        self.cell_ptn[i] = self.level;
         *self.numcells += 1;
     }
 

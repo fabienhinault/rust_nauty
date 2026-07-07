@@ -107,7 +107,7 @@ fn refine_nest(
                 //  0 <= c2 < c1 < cell.len()
                 if 0 <= c2 && c1 < cell.len() {
                     cell.split(c2 as usize);
-                    longcode = mash(longcode, c2 as usize);
+                    longcode = mash(longcode, cell.partition_index(c2 as usize));
                     if active[cell.partition_index(c1)] || (c2 >= (cell.len() - 1 - c1) as isize) {
                         active.add_one(cell.partition_index(c1));
                         if c1 == cell.len() - 1 {
@@ -413,8 +413,10 @@ mod test {
         );
     }
 
+    #[test_case(Graph::no_edge(4), &[1, 0, 2, 3], &[2, 3, NAUTY_INFINITY, 0], 3, 3, &[0, 2, 1], u32_to_bitvec(1073741824, 4), 1431812424, &[1, 0, 3, 2], &[2, 3, NAUTY_INFINITY, 0], 3, &[0, 2, 1], bitvec![usize, Msb0; 0; 4], 64)]
     #[test_case(Graph::no_edge(3), &[0, 2, 1], &[2, NAUTY_INFINITY, 0], 2, 2, &[1, 0], bitvec![usize, Msb0; 1, 0, 0], 21845, &[0, 1, 2], &[2, NAUTY_INFINITY, 0], 2, &[1, 0], bitvec![usize, Msb0; 0; 3], 4)]
     #[test_case(Graph::no_edge(4), &[0, 1, 2, 3], &[2, 3, NAUTY_INFINITY, 0], 3, 3, &[1, 0, 2], u32_to_bitvec(1073741824, 4), 21845, &[0, 1, 3, 2], &[2, 3, NAUTY_INFINITY, 0], 3, &[1, 0, 2], bitvec![usize, Msb0; 0; 4], 64)]
+    #[test_case(Graph::from_u32(&[805306368, 402653184, 2281701376, 3221225472, 1610612736]), &[0, 2, 3, 1, 4], &[3, 3, 2, NAUTY_INFINITY, 0], 3, 4, &[3, 1, 1], u32_to_bitvec(1073741824, 5), 21845, &[0, 2, 3, 4, 1], &[3, 3, 2, 3, 0], 5, &[3, 1, 1], u32_to_bitvec(134217728, 5), 27417; "5_0")]
     fn test_no_nest(
         mut g: Graph,
         lab: &[usize],
@@ -647,33 +649,6 @@ mod test {
     }
 
     #[test]
-    fn test_4_4() {
-        let mut g = Graph::no_edge(4);
-        let mut lab = [1, 0, 2, 3];
-        let mut ptn = [2, 3, NAUTY_INFINITY, 0];
-        let mut numcells = 3;
-        let mut count = vec![0, 2, 1];
-        let mut active: bitvec::prelude::BitVec<usize, Msb0> = u32_to_bitvec(1073741824, 4);
-        let mut code: usize = 1431812424;
-        refine(
-            &mut g,
-            &mut lab,
-            &mut ptn,
-            3,
-            &mut numcells,
-            &mut count,
-            &mut active,
-            &mut code,
-        );
-        assert_eq!(lab, [1, 0, 3, 2]);
-        assert_eq!(ptn, [2, 3, NAUTY_INFINITY, 0]);
-        assert_eq!(numcells, 3);
-        assert_eq!(count, [0, 2, 1]);
-        assert_eq!(active, bitvec![usize, Msb0; 0; 4]);
-        assert_eq!(code, 64);
-    }
-
-    #[test]
     fn test_4_5() {
         let mut g = Graph::from_u32(&[1879048192, 2952790016, 3489660928, 3758096384]);
         let mut lab = [1, 0, 2, 3];
@@ -701,33 +676,6 @@ mod test {
     }
 
     #[test]
-    fn test_5_0() {
-        let mut g = Graph::from_u32(&[805306368, 402653184, 2281701376, 3221225472, 1610612736]);
-        let mut lab = [0, 2, 3, 1, 4];
-        let mut ptn = [3, 3, 2, NAUTY_INFINITY, 0];
-        let mut numcells = 4;
-        let mut count = vec![3, 1, 1];
-        let mut active: bitvec::prelude::BitVec<usize, Msb0> = u32_to_bitvec(1073741824, 5);
-        let mut code: usize = 21845;
-        refine(
-            &mut g,
-            &mut lab,
-            &mut ptn,
-            3,
-            &mut numcells,
-            &mut count,
-            &mut active,
-            &mut code,
-        );
-        assert_eq!(lab, [0, 2, 3, 4, 1]);
-        assert_eq!(ptn, [3, 3, 2, 3, 0]);
-        assert_eq!(numcells, 5);
-        assert_eq!(count, [3, 1, 1]);
-        assert_eq!(active, u32_to_bitvec(134217728, 5));
-        assert_eq!(code, 27417);
-    }
-
-    #[test]
     fn test_refine_diamond_unpartitioned_nest() {
         let mut g = create_diamond();
         let lab = [0, 1, 2, 3];
@@ -739,26 +687,6 @@ mod test {
         let mut active = bitvec![usize, Msb0; 1; 4];
         let mut code: usize = 0;
         refine_nest(&mut g, &mut partition, &mut count, &mut active, &mut code);
-    }
-
-    #[test]
-    fn test_3_1_nest() {
-        let mut g = create_zero(3);
-        let mut lab = [1, 0, 2];
-        let mut ptn = [2, NAUTY_INFINITY, 0];
-        let mut nest = PartitionNest::new(Vec::from_iter(lab), Vec::from_iter(ptn));
-        let mut partition = Partition::new(nest, 2);
-        assert_eq!(partition.numcells(), 2);
-        let mut count = vec![0, 2];
-        let mut active: bitvec::prelude::BitVec<usize, Msb0> = bitvec![usize, Msb0; 1, 0, 0];
-        let mut code: usize = 1431812424;
-        refine_nest(&mut g, &mut partition, &mut count, &mut active, &mut code);
-        assert_eq!(lab, [1, 2, 0]);
-        assert_eq!(ptn, [2, NAUTY_INFINITY, 0]);
-        assert_eq!(count, [0, 2]);
-        assert_eq!(partition.numcells(), 2);
-        assert_eq!(active, bitvec![usize, Msb0; 0; 3]);
-        assert_eq!(code, 4);
     }
 
     #[test]
@@ -801,11 +729,12 @@ mod test {
         assert_eq!(code, 4);
     }
 
+    #[test_case(Graph::no_edge(3), &[1, 0, 2], &[2, NAUTY_INFINITY, 0], 2, 2, &[0, 2], bitvec![usize, Msb0; 1, 0, 0], 1431812424, &[1, 2, 0], &[2, NAUTY_INFINITY, 0], 2, &[0, 2], bitvec![usize, Msb0; 0; 3], 4)]
     #[test_case(Graph::no_edge(3), &[0, 2, 1], &[2, NAUTY_INFINITY, 0], 2, 2, &[1, 0], bitvec![usize, Msb0; 1, 0, 0], 21845, &[0, 1, 2], &[2, NAUTY_INFINITY, 0], 2, &[1, 0], bitvec![usize, Msb0; 0; 3], 4)]
     #[test_case(Graph::no_edge(4), &[0, 3, 2, 1], &[2, NAUTY_INFINITY, NAUTY_INFINITY, 0], 2, 2, &[1, 0], bitvec![usize, Msb0; 1, 0, 0, 0], 21845, &[0, 2, 1, 3], &[2, NAUTY_INFINITY, NAUTY_INFINITY, 0], 2, &[1, 0], bitvec![usize, Msb0; 0; 4], 4)]
-    #[test_case(Graph::from_u32(&[805306368, 402653184, 2281701376, 3221225472, 1610612736]), &[0, 2, 3, 1, 4], &[2, NAUTY_INFINITY, 2, NAUTY_INFINITY, 0], 3, 3, &[0, 2, 1], u32_to_bitvec(0, 5), 21845, &[1, 0, 2, 3, 4], &[2, NAUTY_INFINITY, 2, NAUTY_INFINITY, 0], 3, &[3, 1, 1], bitvec![usize, Msb0; 0; 5], 27427)]
+    #[test_case(Graph::from_u32(&[805306368, 402653184, 2281701376, 3221225472, 1610612736]), &[0, 2, 3, 1, 4], &[3, 3, 2, NAUTY_INFINITY, 0], 3, 4, &[3, 1, 1], u32_to_bitvec(1073741824, 5), 21845, &[0, 2, 3, 4, 1], &[3, 3, 2, 3, 0], 5, &[3, 1, 1], u32_to_bitvec(134217728, 5), 27417; "5_0")]
     #[test_case(Graph::from_u32(&[1879048192, 2952790016, 3489660928, 3758096384]), &[1, 0, 2, 3], &[2, 3, NAUTY_INFINITY, 0], 3, 3, &[0, 2, 1], u32_to_bitvec(1073741824, 4), 1431812424, &[1, 0, 2, 3], &[2, 3, NAUTY_INFINITY, 0], 3, &[0, 2, 1], bitvec![usize, Msb0; 0; 4], 64)]
-    #[test_case(Graph::no_edge(4), &[1, 0, 2, 3], &[2, 3, NAUTY_INFINITY, 0], 3, 3, &[0, 2, 1], u32_to_bitvec(1073741824, 4), 1431812424, &[1, 0, 3, 2], &[2, 3, NAUTY_INFINITY, 0], 4, &[0, 2, 1], bitvec![usize, Msb0; 0; 4], 64)]
+    #[test_case(Graph::no_edge(4), &[1, 0, 2, 3], &[2, 3, NAUTY_INFINITY, 0], 3, 3, &[0, 2, 1], u32_to_bitvec(1073741824, 4), 1431812424, &[1, 0, 3, 2], &[2, 3, NAUTY_INFINITY, 0], 3, &[0, 2, 1], bitvec![usize, Msb0; 0; 4], 64)]
     #[test_case(Graph::no_edge(4), &[1, 0, 2, 3], &[2, NAUTY_INFINITY, NAUTY_INFINITY, 0], 3, 2, &[0, 2], u32_to_bitvec(2147483648, 4), 1431812424, &[1, 2, 3, 0], &[2, NAUTY_INFINITY, NAUTY_INFINITY, 0], 2, &[0, 2], bitvec![usize, Msb0; 0; 4], 4)]
     #[test_case(Graph::no_edge(4), &[0, 2, 1, 3], &[2, 3, NAUTY_INFINITY, 0], 3, 3, &[0, 1, 3], u32_to_bitvec(1073741824, 4), 1431812424, &[0, 2, 3, 1], &[2, 3, NAUTY_INFINITY, 0], 3, &[0, 1, 3], bitvec![usize, Msb0; 0; 4], 64)]
     #[test_case(Graph::no_edge(4), &[0, 1, 2, 3], &[2, 3, NAUTY_INFINITY, 0], 3, 3, &[1, 0, 2], u32_to_bitvec(1073741824, 4), 21845, &[0, 1, 3, 2], &[2, 3, NAUTY_INFINITY, 0], 3, &[1, 0, 2], bitvec![usize, Msb0; 0; 4], 64)]
