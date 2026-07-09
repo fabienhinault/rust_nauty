@@ -17,6 +17,7 @@ mod partition_nest_chunk_by_mut;
 /// *    This is  refined for the root of the tree, which has level 1.           *
 #[derive(Default, PartialEq)]
 pub struct PartitionNest {
+    /// lab must always be a permutation of [[0, n-1]]
     lab: Vec<usize>,
     ptn: Vec<usize>,
     /// Denormalized numbers of cells at all levels.
@@ -31,25 +32,28 @@ impl PartitionNest {
             ptn,
             numcells: vec![],
         };
-        let max_level = nest.max_level();
-        if let Some(max_level) = max_level {
-            for level in 0..=max_level {
-                let partition = nest.partition_vec(level);
-                nest.numcells.push(partition.len());
-            }
+        for level in 0..=nest.max_level() {
+            let partition = nest.partition_vec(level);
+            nest.numcells.push(partition.len());
         }
         nest
+    }
+
+    pub fn assert_is_sane(&self) {
+        let mut lab = self.lab.clone();
+        lab.sort();
+        assert_eq!(lab, (0..lab.len()).collect::<Vec<_>>());
     }
 
     pub fn swap(&mut self, c1: usize, c2: usize) {
         self.lab.swap(c1, c2);
     }
 
-    pub fn chunk_by(&self, level: usize) -> PartitionNestChunkBy {
+    pub fn chunk_by(&self, level: usize) -> PartitionNestChunkBy<'_> {
         PartitionNestChunkBy::new(&self.lab, &self.ptn, level)
     }
 
-    pub fn chunk_by_mut(&mut self, level: usize) -> PartitionNestChunkByMut {
+    pub fn chunk_by_mut(&mut self, level: usize) -> PartitionNestChunkByMut<'_> {
         PartitionNestChunkByMut::new(&mut self.lab, &mut self.ptn, level)
     }
 
@@ -77,12 +81,13 @@ impl PartitionNest {
         .collect()
     }
 
-    pub fn max_level(&self) -> Option<usize> {
-        self.ptn
+    pub fn max_level(&self) -> usize {
+        *self
+            .ptn
             .iter()
             .filter(|l| l < &&NAUTY_INFINITY)
             .max()
-            .copied()
+            .unwrap_or(&0)
     }
 
     /// last index of cell containing i for partition of given level
@@ -96,6 +101,24 @@ impl PartitionNest {
 
     pub fn get(&self, i: usize) -> usize {
         self.lab[i]
+    }
+
+    pub fn numcells(&self, level: usize) -> usize {
+        self.numcells[level.min(self.max_level())]
+    }
+
+    pub fn max_level_numcells(&self) -> usize {
+        self.numcells[self.max_level()]
+    }
+
+    fn numcells_mut(&mut self, level: usize) -> &mut usize {
+        if level >= self.numcells.len() {
+            self.numcells.extend_from_slice(&vec![
+                self.max_level_numcells();
+                level - self.numcells.len()
+            ]);
+        }
+        &mut self.numcells[level]
     }
 }
 
@@ -113,12 +136,9 @@ impl Debug for PartitionNest {
             .field("lab", &self.lab)
             .field("ptn", &self.ptn)
             .finish()?;
-        if let Some(max_level) = self.max_level() {
-            #[allow(clippy::writeln_empty_string)]
-            writeln!(f, "")?;
-            for l in 0..=max_level {
-                writeln!(f, "{l}:  {}", self.partition_string(l))?;
-            }
+        writeln!(f)?;
+        for l in 0..=self.max_level() {
+            writeln!(f, "{l}:  {}", self.partition_string(l))?;
         }
         Ok(())
     }
@@ -136,7 +156,11 @@ impl Partition {
     }
 
     pub fn numcells(&self) -> usize {
-        self.nest.numcells[self.level]
+        self.nest.numcells(self.level)
+    }
+
+    pub fn numcells_mut(&mut self) -> &mut usize {
+        self.nest.numcells_mut(self.level)
     }
 
     /// last index of cell containing i for partition of given level
@@ -148,18 +172,18 @@ impl Partition {
         end
     }
 
-    pub fn raw_cells(&self) -> PartitionNestChunkBy {
+    pub fn raw_cells(&self) -> PartitionNestChunkBy<'_> {
         self.nest.chunk_by(self.level)
     }
 
-    pub fn cells(&self) -> PartitionCellsIter {
+    pub fn cells(&self) -> PartitionCellsIter<'_> {
         PartitionCellsIter {
             partition: self,
             index: 0,
         }
     }
 
-    pub fn cells_mut(&mut self) -> PartitionCellsIterMut {
+    pub fn cells_mut(&mut self) -> PartitionCellsIterMut<'_> {
         PartitionCellsIterMut {
             partition: self,
             index: 0,
@@ -194,7 +218,6 @@ pub struct Cell<'a> {
     partition: &'a Partition,
     first_lab_index: usize,
     cell_lab: &'a [usize],
-    cell_ptn: &'a [usize],
 }
 
 impl<'a> Cell<'a> {
@@ -204,6 +227,11 @@ impl<'a> Cell<'a> {
 
     pub fn len(&self) -> usize {
         self.cell_lab.len()
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.cell_lab.is_empty()
     }
 }
 
@@ -282,7 +310,6 @@ impl<'a> Iterator for PartitionCellsIter<'a> {
                 partition: self.partition,
                 first_lab_index,
                 cell_lab: &self.partition.nest.lab[first_lab_index..self.index],
-                cell_ptn: &self.partition.nest.ptn[first_lab_index..self.index],
             })
         }
     }
