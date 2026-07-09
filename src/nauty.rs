@@ -759,7 +759,7 @@ pub mod test {
     //  / \
     // 0---2
     //  \ /
-    //   4
+    //   3
     pub fn create_diamond() -> Graph {
         Graph(vec![
             //                   0  1  2  3

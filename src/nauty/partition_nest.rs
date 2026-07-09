@@ -112,13 +112,17 @@ impl PartitionNest {
     }
 
     fn numcells_mut(&mut self, level: usize) -> &mut usize {
+        self.extend_numcells(level);
+        &mut self.numcells[level]
+    }
+
+    fn extend_numcells(&mut self, level: usize) {
         if level >= self.numcells.len() {
             self.numcells.extend_from_slice(&vec![
                 self.max_level_numcells();
-                level - self.numcells.len()
+                level - self.numcells.len() + 1
             ]);
         }
-        &mut self.numcells[level]
     }
 }
 
@@ -151,7 +155,8 @@ pub struct Partition {
 }
 
 impl Partition {
-    pub fn new(nest: PartitionNest, level: usize) -> Self {
+    pub fn new(mut nest: PartitionNest, level: usize) -> Self {
+        nest.extend_numcells(level);
         Self { nest, level }
     }
 
@@ -448,6 +453,22 @@ mod test {
                 + "1:  4, 6, 2, 0 | 8, 7, 5, 9 | 3, 1\n"
                 + "2:  4, 6, 2, 0 | 8 | 7, 5, 9 | 3 | 1\n"
                 + "3:  4, 6 | 2, 0 | 8 | 7, 5, 9 | 3 | 1\n"
+        );
+    }
+
+    #[test]
+    fn test_unpartioned_4() {
+        assert_eq!(
+            format!(
+                "{:?}",
+                PartitionNest::new(
+                    vec![0, 1, 2, 3],
+                    vec![NAUTY_INFINITY, NAUTY_INFINITY, NAUTY_INFINITY, 0]
+                )
+            ),
+            "".to_owned()
+                + "PartitionNest { lab: [0, 1, 2, 3], ptn: [2000000002, 2000000002, 2000000002, 0] }\n"
+                + "0:  0, 1, 2, 3\n"
         );
     }
 }

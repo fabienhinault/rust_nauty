@@ -61,9 +61,8 @@ fn refine_nest(
     let mut maxcell: isize;
     let mut maxpos: Option<usize> = None;
     let mut hint: usize;
-
-    let workperm: Vec<usize> = Vec::with_capacity(g.n());
-    let mut bucket: Vec<usize> = Vec::with_capacity(g.n() + 2);
+    let workperm: Vec<usize> = vec![0; g.n()];
+    let mut bucket: Vec<usize> = vec![0; g.n() + 2];
 
     longcode = partition.numcells();
     hint = 0;
@@ -233,9 +232,8 @@ fn refine(
     let mut maxcell: isize;
     let mut maxpos: Option<usize> = None;
     let mut hint: usize;
-
-    let workperm: Vec<usize> = Vec::with_capacity(g.n());
-    let mut bucket: Vec<usize> = Vec::with_capacity(g.n() + 2);
+    let workperm: Vec<usize> = vec![0; g.n()];
+    let mut bucket: Vec<usize> = vec![0; g.n() + 2];
 
     longcode = *numcells;
     hint = 0;
@@ -392,27 +390,7 @@ mod test {
         assert!(!is_autom(&create_n_circle(4), &[1, 0, 2, 3]));
     }
 
-    #[test]
-    fn test_refine_diamond_unpartitioned() {
-        let mut g = create_diamond();
-        let mut lab = [0, 1, 2, 3];
-        let mut ptn = [1, 1, 1, 1, 0];
-        let mut count = vec![4];
-        let mut numcells = 1;
-        let mut active = bitvec![usize, Msb0; 1; 4];
-        let mut code: usize = 0;
-        refine(
-            &mut g,
-            &mut lab,
-            &mut ptn,
-            0,
-            &mut numcells,
-            &mut count,
-            &mut active,
-            &mut code,
-        );
-    }
-
+    #[test_case(create_diamond(), &[0, 1, 2, 3], &[NAUTY_INFINITY, NAUTY_INFINITY, NAUTY_INFINITY, 0], 0, 1, &[4, 4, 4, 4], bitvec![usize, Msb0; 1; 4], 0, &[0, 2, 3, 1], &[NAUTY_INFINITY, 0, NAUTY_INFINITY, 0], 2, &[0, 0, 0, 0], bitvec![usize, Msb0; 0; 4], 8; "diamond_unpartitioned")]
     #[test_case(Graph::no_edge(4), &[1, 0, 2, 3], &[2, 3, NAUTY_INFINITY, 0], 3, 3, &[0, 2, 1], u32_to_bitvec(1073741824, 4), 1431812424, &[1, 0, 3, 2], &[2, 3, NAUTY_INFINITY, 0], 3, &[0, 2, 1], bitvec![usize, Msb0; 0; 4], 64)]
     #[test_case(Graph::no_edge(3), &[0, 2, 1], &[2, NAUTY_INFINITY, 0], 2, 2, &[1, 0], bitvec![usize, Msb0; 1, 0, 0], 21845, &[0, 1, 2], &[2, NAUTY_INFINITY, 0], 2, &[1, 0], bitvec![usize, Msb0; 0; 3], 4)]
     #[test_case(Graph::no_edge(4), &[0, 1, 2, 3], &[2, 3, NAUTY_INFINITY, 0], 3, 3, &[1, 0, 2], u32_to_bitvec(1073741824, 4), 21845, &[0, 1, 3, 2], &[2, 3, NAUTY_INFINITY, 0], 3, &[1, 0, 2], bitvec![usize, Msb0; 0; 4], 64)]
@@ -650,20 +628,6 @@ mod test {
     }
 
     #[test]
-    fn test_refine_diamond_unpartitioned_nest() {
-        let mut g = create_diamond();
-        let lab = [0, 1, 2, 3];
-        let ptn = [1, 1, 1, 1, 0];
-        let nest = PartitionNest::new(Vec::from_iter(lab), Vec::from_iter(ptn));
-        let mut partition = Partition::new(nest, 0);
-        let mut count = vec![4];
-        assert_eq!(partition.numcells(), 1);
-        let mut active = bitvec![usize, Msb0; 1; 4];
-        let mut code: usize = 0;
-        refine_nest(&mut g, &mut partition, &mut count, &mut active, &mut code);
-    }
-
-    #[test]
     fn test_3_2_nest() {
         let mut g = Graph::from_u32(&[1610612736, 2684354560, 3221225472]);
         let mut lab = [0, 2, 1];
@@ -703,13 +667,14 @@ mod test {
         assert_eq!(code, 4);
     }
 
+    #[test_case(create_diamond(), &[0, 1, 2, 3], &[NAUTY_INFINITY, NAUTY_INFINITY, NAUTY_INFINITY, 0], 0, 1, &[4, 4, 4, 4], bitvec![usize, Msb0; 1; 4], 0, &[0, 2, 3, 1], &[NAUTY_INFINITY, 0, NAUTY_INFINITY, 0], 2, &[0, 0, 0, 0], bitvec![usize, Msb0; 0; 4], 8; "diamond_unpartitioned")]
     #[test_case(Graph::no_edge(3), &[1, 0, 2], &[2, NAUTY_INFINITY, 0], 2, 2, &[0, 2], bitvec![usize, Msb0; 1, 0, 0], 1431812424, &[1, 2, 0], &[2, NAUTY_INFINITY, 0], 2, &[0, 2], bitvec![usize, Msb0; 0; 3], 4)]
     #[test_case(Graph::no_edge(3), &[0, 2, 1], &[2, NAUTY_INFINITY, 0], 2, 2, &[1, 0], bitvec![usize, Msb0; 1, 0, 0], 21845, &[0, 1, 2], &[2, NAUTY_INFINITY, 0], 2, &[1, 0], bitvec![usize, Msb0; 0; 3], 4)]
     #[test_case(Graph::no_edge(4), &[0, 3, 2, 1], &[2, NAUTY_INFINITY, NAUTY_INFINITY, 0], 2, 2, &[1, 0], bitvec![usize, Msb0; 1, 0, 0, 0], 21845, &[0, 2, 1, 3], &[2, NAUTY_INFINITY, NAUTY_INFINITY, 0], 2, &[1, 0], bitvec![usize, Msb0; 0; 4], 4)]
     #[test_case(Graph::from_u32(&[805306368, 402653184, 2281701376, 3221225472, 1610612736]), &[0, 2, 3, 1, 4], &[3, 3, 2, NAUTY_INFINITY, 0], 3, 4, &[3, 1, 1], u32_to_bitvec(1073741824, 5), 21845, &[0, 2, 3, 4, 1], &[3, 3, 2, 3, 0], 5, &[3, 1, 1], u32_to_bitvec(134217728, 5), 27417; "5_0")]
     #[test_case(Graph::from_u32(&[1879048192, 2952790016, 3489660928, 3758096384]), &[1, 0, 2, 3], &[2, 3, NAUTY_INFINITY, 0], 3, 3, &[0, 2, 1], u32_to_bitvec(1073741824, 4), 1431812424, &[1, 0, 2, 3], &[2, 3, NAUTY_INFINITY, 0], 3, &[0, 2, 1], bitvec![usize, Msb0; 0; 4], 64)]
     #[test_case(Graph::no_edge(4), &[1, 0, 2, 3], &[2, 3, NAUTY_INFINITY, 0], 3, 3, &[0, 2, 1], u32_to_bitvec(1073741824, 4), 1431812424, &[1, 0, 3, 2], &[2, 3, NAUTY_INFINITY, 0], 3, &[0, 2, 1], bitvec![usize, Msb0; 0; 4], 64)]
-    #[test_case(Graph::no_edge(4), &[1, 0, 2, 3], &[2, NAUTY_INFINITY, NAUTY_INFINITY, 0], 3, 2, &[0, 2], u32_to_bitvec(2147483648, 4), 1431812424, &[1, 2, 3, 0], &[2, NAUTY_INFINITY, NAUTY_INFINITY, 0], 2, &[0, 2], bitvec![usize, Msb0; 0; 4], 4)]
+    #[test_case(Graph::no_edge(4), &[1, 0, 2, 3], &[2, NAUTY_INFINITY, NAUTY_INFINITY, 0], 3, 2, &[0, 2], u32_to_bitvec(2147483648, 4), 1431812424, &[1, 2, 3, 0], &[2, NAUTY_INFINITY, NAUTY_INFINITY, 0], 2, &[0, 2], bitvec![usize, Msb0; 0; 4], 4; "4_3")]
     #[test_case(Graph::no_edge(4), &[0, 2, 1, 3], &[2, 3, NAUTY_INFINITY, 0], 3, 3, &[0, 1, 3], u32_to_bitvec(1073741824, 4), 1431812424, &[0, 2, 3, 1], &[2, 3, NAUTY_INFINITY, 0], 3, &[0, 1, 3], bitvec![usize, Msb0; 0; 4], 64)]
     #[test_case(Graph::no_edge(4), &[0, 1, 2, 3], &[2, 3, NAUTY_INFINITY, 0], 3, 3, &[1, 0, 2], u32_to_bitvec(1073741824, 4), 21845, &[0, 1, 3, 2], &[2, 3, NAUTY_INFINITY, 0], 3, &[1, 0, 2], bitvec![usize, Msb0; 0; 4], 64)]
     fn test_nest(
