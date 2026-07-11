@@ -354,20 +354,18 @@ impl<'a> CellMut<'a> {
     /// partition the cell, put splitter neighbours first
     /// returns the number of neighbours
     pub fn partition_in_place_orig(&mut self, splitter_neighbours: &Set) -> usize {
-        let mut iter = self.cell_lab.iter_mut();
-        let predicate = |c: &usize| splitter_neighbours[*c];
-        let mut true_count = 0;
-        while let Some(head) = iter.next() {
-            while let Some(tail) = iter.next_back() {
-                if predicate(head) {
-                    true_count += 1;
-                    break;
-                } else {
-                    std::mem::swap(head, tail);
-                }
+        let mut c1: usize = 0;
+        // c2 can be -1
+        let mut c2: isize = self.len() as isize - 1;
+        while c1 as isize <= c2 {
+            if splitter_neighbours[self[c1]] {
+                c1 += 1;
+            } else {
+                self.swap(c1, c2 as usize);
+                c2 -= 1;
             }
         }
-        true_count
+        c1
     }
 }
 
