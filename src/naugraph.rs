@@ -1,12 +1,8 @@
 use crate::{
     nautil::SetWordNautilTrait,
-    nauty::{
-        Graph, NautyEnv, Set, SetTrait,
-        partition_nest::{Partition, PartitionNest},
-    },
+    nauty::{Graph, Set, SetTrait, partition_nest::Partition},
 };
 use cfor::cfor;
-use core::num;
 
 struct NaugraphEnv {
     pub workset: Vec<Set>,
@@ -43,6 +39,16 @@ fn is_autom(g: &Graph, perm: &[usize]) -> bool {
     true
 }
 
+///
+///
+///    g: &mut Graph,   
+///    lab: &mut [usize],        labels
+///    ptn: &mut [isize],        partition
+///    level: isize,             recursion level
+///    numcells: &mut usize,     number of cells
+///    count: &mut Vec<usize>,   number of vertices in cells
+///    active: &mut Set,         vertices not fixed yet
+///    code: &mut usize,         
 fn refine_nest(
     g: &mut Graph,
     partition: &mut Partition,
@@ -57,7 +63,6 @@ fn refine_nest(
     let mut bmin: usize;
     let mut bmax: usize;
     let mut longcode: usize;
-    let mut gptr: &Set;
     let mut maxcell: isize;
     let mut maxpos: Option<usize> = None;
     let mut hint: usize;
@@ -85,36 +90,24 @@ fn refine_nest(
         longcode = mash(longcode, split1 + split2);
         /* trivial splitting cell */
         if split1 == split2 {
-            gptr = &g.0[partition[split1]];
+            let gptr = &g.0[partition[split1]];
             let mut cells = partition.cells_mut();
             while let Some(mut cell) = cells.next() {
-                let mut c1: usize;
-                let mut c2: isize;
                 if cell.len() == 1 {
                     continue;
                 }
-                c1 = 0;
-                c2 = cell.len() as isize - 1;
-                while c1 as isize <= c2 {
-                    if gptr[cell[c1]] {
-                        c1 += 1;
-                    } else {
-                        cell.swap(c1, c2 as usize);
-                        c2 -= 1;
-                    }
-                }
-                //  0 <= c2 < c1 < cell.len()
-                if 0 <= c2 && c1 < cell.len() {
-                    cell.split(c2 as usize);
-                    longcode = mash(longcode, cell.partition_index(c2 as usize));
-                    if active[cell.partition_index(c1)] || (c2 >= (cell.len() - 1 - c1) as isize) {
-                        active.add_one(cell.partition_index(c1));
-                        if c1 == cell.len() - 1 {
-                            hint = c1;
+                let i = cell.partition_in_place_orig(gptr);
+                if i > 0 && i < cell.len() {
+                    cell.split(i - 1);
+                    longcode = mash(longcode, cell.partition_index(i - 1));
+                    if active[cell.partition_index(i)] || 2 * i >= cell.len() {
+                        active.add_one(cell.partition_index(i));
+                        if i == cell.len() - 1 {
+                            hint = cell.partition_index(i);
                         }
                     } else {
                         active.add_one(cell.partition_index(0));
-                        if c2 == 0 {
+                        if i == 1 {
                             hint = cell.partition_index(0);
                         }
                     }
@@ -204,8 +197,9 @@ fn refine_nest(
 ///    level: isize,             recursion level
 ///    numcells: &mut usize,     number of cells
 ///    count: &mut Vec<usize>,   number of vertices in cells
-///    active: &mut Set,         
+///    active: &mut Set,         vertices not fixed yet
 ///    code: &mut usize,         
+#[allow(clippy::too_many_arguments)]
 fn refine(
     g: &mut Graph,
     lab: &mut [usize],
@@ -228,7 +222,6 @@ fn refine(
     let mut bmin: usize;
     let mut bmax: usize;
     let mut longcode: usize;
-    let mut gptr: &Set;
     let mut maxcell: isize;
     let mut maxpos: Option<usize> = None;
     let mut hint: usize;
@@ -259,7 +252,7 @@ fn refine(
         longcode = mash(longcode, split1 + split2);
         /* trivial splitting cell */
         if split1 == split2 {
-            gptr = &g.0[lab[split1]];
+            let gptr = &g.0[lab[split1]];
             cell2 = 0;
             cfor! {cell1 = 0; cell1 < g.n(); cell1 = cell2 + 1; {
                 cfor! {cell2 = cell1; ptn[cell2] > level; cell2 += 1; {}}
@@ -378,6 +371,7 @@ mod test {
     use super::*;
     use crate::nauty::{
         NAUTY_INFINITY,
+        partition_nest::PartitionNest,
         test::{create_diamond, create_n_circle, create_zero},
         u32_to_bitvec,
     };
@@ -402,6 +396,7 @@ mod test {
     #[test_case(Graph::no_edge(4), &[0, 2, 1, 3], &[2, 3, NAUTY_INFINITY, 0], 3, 3, &[0, 1, 3], u32_to_bitvec(1073741824, 4), 1431812424, &[0, 2, 3, 1], &[2, 3, NAUTY_INFINITY, 0], 3, &[0, 1, 3], bitvec![usize, Msb0; 0; 4], 64)]
     #[test_case(Graph::no_edge(4), &[0, 1, 2, 3], &[2, 3, NAUTY_INFINITY, 0], 3, 3, &[1, 0, 2], u32_to_bitvec(1073741824, 4), 21845, &[0, 1, 3, 2], &[2, 3, NAUTY_INFINITY, 0], 3, &[1, 0, 2], bitvec![usize, Msb0; 0; 4], 64)]
     #[test_case(Graph::no_edge(4), &[1, 0, 2, 3], &[2, 3, NAUTY_INFINITY, 0], 3, 3, &[0, 2, 1], u32_to_bitvec(1073741824, 4), 1431812424, &[1, 0, 3, 2], &[2, 3, NAUTY_INFINITY, 0], 3, &[0, 2, 1], bitvec![usize, Msb0; 0; 4], 64)]
+    #[allow(clippy::too_many_arguments)]
     fn test_no_nest(
         mut g: Graph,
         lab: &[usize],
@@ -456,6 +451,7 @@ mod test {
     #[test_case(Graph::no_edge(4), &[1, 0, 2, 3], &[2, NAUTY_INFINITY, NAUTY_INFINITY, 0], 3, 2, &[0, 2], u32_to_bitvec(2147483648, 4), 1431812424, &[1, 2, 3, 0], &[2, NAUTY_INFINITY, NAUTY_INFINITY, 0], 2, &[0, 2], bitvec![usize, Msb0; 0; 4], 4; "4_3")]
     #[test_case(Graph::no_edge(4), &[0, 2, 1, 3], &[2, 3, NAUTY_INFINITY, 0], 3, 3, &[0, 1, 3], u32_to_bitvec(1073741824, 4), 1431812424, &[0, 2, 3, 1], &[2, 3, NAUTY_INFINITY, 0], 3, &[0, 1, 3], bitvec![usize, Msb0; 0; 4], 64)]
     #[test_case(Graph::no_edge(4), &[0, 1, 2, 3], &[2, 3, NAUTY_INFINITY, 0], 3, 3, &[1, 0, 2], u32_to_bitvec(1073741824, 4), 21845, &[0, 1, 3, 2], &[2, 3, NAUTY_INFINITY, 0], 3, &[1, 0, 2], bitvec![usize, Msb0; 0; 4], 64)]
+    #[allow(clippy::too_many_arguments)]
     fn test_nest(
         mut g: Graph,
         lab: &[usize],
@@ -472,6 +468,7 @@ mod test {
         expected_active: BitVec<usize, Msb0>,
         expected_code: usize,
     ) {
+        println!("{}", g.to_matrix());
         let nest = PartitionNest::new(lab.to_vec(), ptn.to_vec());
         let mut partition = Partition::new(nest, level);
         assert_eq!(partition.numcells(), expected_numcells_before);

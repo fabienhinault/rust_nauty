@@ -1,4 +1,4 @@
-use crate::nauty::NAUTY_INFINITY;
+use crate::nauty::{NAUTY_INFINITY, Set};
 use partition_nest_chunk_by::PartitionNestChunkBy;
 use partition_nest_chunk_by_mut::PartitionNestChunkByMut;
 use std::{
@@ -240,6 +240,80 @@ impl<'a> Cell<'a> {
     }
 }
 
+/// https://doc.rust-lang.org/src/core/iter/traits/iterator.rs.html#2334-2337
+///
+/// Reorders the elements of this iterator *in-place* according to the given predicate,
+/// such that all those that return `true` precede all those that return `false`.
+/// Returns the number of `true` elements found.
+///
+/// The relative order of partitioned items is not maintained.
+///
+/// # Current implementation
+///
+/// The current algorithm tries to find the first element for which the predicate evaluates
+/// to false and the last element for which it evaluates to true, and repeatedly swaps them.
+///
+/// Time complexity: *O*(*n*)
+///
+/// See also [`is_partitioned()`] and [`partition()`].
+///
+/// [`is_partitioned()`]: Iterator::is_partitioned
+/// [`partition()`]: Iterator::partition
+///
+/// # Examples
+///
+/// ```
+/// #![feature(iter_partition_in_place)]
+///
+/// let mut a = [1, 2, 3, 4, 5, 6, 7];
+///
+/// // Partition in-place between evens and odds
+/// let i = a.iter_mut().partition_in_place(|n| n % 2 == 0);
+///
+/// assert_eq!(i, 3);
+/// assert!(a[..i].iter().all(|n| n % 2 == 0)); // evens
+/// assert!(a[i..].iter().all(|n| n % 2 == 1)); // odds
+/// ```
+fn partition_in_place<'a, P>(slice: &mut [usize], ref mut predicate: P) -> usize
+where
+    P: FnMut(&usize) -> bool,
+{
+    // FIXME: should we worry about the count overflowing? The only way to have more than
+    // `usize::MAX` mutable references is with ZSTs, which aren't useful to partition...
+
+    // These closure "factory" functions exist to avoid genericity in `Self`.
+
+    #[inline]
+    fn is_false<'a, T>(
+        predicate: &'a mut impl FnMut(&T) -> bool,
+        true_count: &'a mut usize,
+    ) -> impl FnMut(&&mut T) -> bool + 'a {
+        move |x| {
+            let p = predicate(&**x);
+            *true_count += p as usize;
+            !p
+        }
+    }
+
+    #[inline]
+    fn is_true<T>(predicate: &mut impl FnMut(&T) -> bool) -> impl FnMut(&&mut T) -> bool + '_ {
+        move |x| predicate(&**x)
+    }
+
+    let mut iter = slice.into_iter();
+    // Repeatedly find the first `false` and swap it with the last `true`.
+    let mut true_count = 0;
+    while let Some(head) = iter.find(is_false(predicate, &mut true_count)) {
+        if let Some(tail) = iter.rfind(is_true(predicate)) {
+            std::mem::swap(head, tail);
+            true_count += 1;
+        } else {
+            break;
+        }
+    }
+    true_count
+}
+
 pub struct CellMut<'a> {
     level: usize,
     first_lab_index: usize,
@@ -269,6 +343,31 @@ impl<'a> CellMut<'a> {
 
     pub fn partition_index(&self, i: usize) -> usize {
         self.first_lab_index + i
+    }
+
+    /// partition the cell, put splitter neighbours first
+    /// returns the number of neighbours
+    pub fn partition_in_place_std(&mut self, splitter_neighbours: &Set) -> usize {
+        partition_in_place(self.cell_lab, |c| splitter_neighbours[*c])
+    }
+
+    /// partition the cell, put splitter neighbours first
+    /// returns the number of neighbours
+    pub fn partition_in_place_orig(&mut self, splitter_neighbours: &Set) -> usize {
+        let mut iter = self.cell_lab.iter_mut();
+        let predicate = |c: &usize| splitter_neighbours[*c];
+        let mut true_count = 0;
+        while let Some(head) = iter.next() {
+            while let Some(tail) = iter.next_back() {
+                if predicate(head) {
+                    true_count += 1;
+                    break;
+                } else {
+                    std::mem::swap(head, tail);
+                }
+            }
+        }
+        true_count
     }
 }
 
@@ -375,6 +474,7 @@ impl<'a> PartitionCellsIterMut<'a> {
 mod test {
     use super::*;
     use crate::nauty::NAUTY_INFINITY;
+    use bitvec::{bitvec, order::Msb0};
     use test_case::test_case;
 
     const LAB: &[usize] = &[4, 6, 2, 0, 8, 7, 5, 9, 3, 1];
@@ -390,6 +490,7 @@ mod test {
         2,
         0,
     ];
+
     #[test_case(LAB, PTN, 0, &[&[4, 6, 2, 0, 8, 7, 5, 9], &[3, 1]])]
     #[test_case(LAB, PTN, 1, &[&[4, 6, 2, 0], &[8, 7, 5, 9], &[3, 1]])]
     #[test_case(LAB, PTN, 2, &[&[4, 6, 2, 0], &[8], &[7, 5, 9], &[3], &[1]])]
@@ -470,5 +571,30 @@ mod test {
                 + "PartitionNest { lab: [0, 1, 2, 3], ptn: [2000000002, 2000000002, 2000000002, 0] }\n"
                 + "0:  0, 1, 2, 3\n"
         );
+    }
+
+    #[test_case(Partition::new(PartitionNest::new(vec![0, 2, 1], vec![2, NAUTY_INFINITY, 0]),2), 2, 1, bitvec![usize, Msb0; 0; 3], 0, &[0, 1, 2], &[2, NAUTY_INFINITY, 0],2)]
+    #[allow(clippy::too_many_arguments)]
+    fn test_partition_inplace_orig(
+        mut partition: Partition,
+        expected_numcells_before: usize,
+        i_cell: usize,
+        gptr: Set,
+        expected_true_count: usize,
+        expected_lab: &[usize],
+        expected_ptn: &[usize],
+        expected_numcells_after: usize,
+    ) {
+        assert_eq!(partition.numcells(), expected_numcells_before);
+        let mut cells_mut = partition.cells_mut();
+        let mut cell = cells_mut.next().unwrap();
+        for _ in 0..(i_cell) {
+            cell = cells_mut.next().unwrap();
+        }
+        let true_count = cell.partition_in_place_orig(&gptr);
+        assert_eq!(true_count, expected_true_count);
+        assert_eq!(partition.numcells(), expected_numcells_after);
+        assert_eq!(partition.nest.lab, expected_lab);
+        assert_eq!(partition.nest.ptn, expected_ptn);
     }
 }

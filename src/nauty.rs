@@ -247,6 +247,22 @@ impl Graph {
         G6String::from(self).to_string()
     }
 
+    pub fn to_matrix(&self) -> String {
+        itertools::Itertools::intersperse(
+            self.0.iter().map(|row| {
+                let s: String = itertools::Itertools::intersperse(
+                    row.iter()
+                        .map(|other_vertex| if *other_vertex { "1" } else { "0" }),
+                    " ",
+                )
+                .collect();
+                s
+            }),
+            "\n".to_owned(),
+        )
+        .collect()
+    }
+
     pub(crate) fn from_graph6(g6: String) -> Result<Self, G6Error> {
         let mut iter: std::slice::Iter<'_, u8> = g6.as_bytes().iter();
         let n = graph_size(&mut iter)?;

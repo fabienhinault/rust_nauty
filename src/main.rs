@@ -35,8 +35,8 @@ fn main() {
     }
     let mut ecount = vec![0; 1 + maxn * (maxn - 1)];
 
-    let mut g = Graph::default();
-    let mut deg: [usize; 1] = [0];
+    let mut _g = Graph::default();
+    let mut _deg: [usize; 1] = [0];
 
     let connec: u8;
     if args.connec2 {
