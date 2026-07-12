@@ -399,8 +399,8 @@ mod test {
     }
 
     #[test_case(create_diamond(), &[0, 1, 2, 3], &[NAUTY_INFINITY, NAUTY_INFINITY, NAUTY_INFINITY, 0], 0, 1, &[4, 4, 4, 4], bitvec![usize, Msb0; 1; 4], 0, &[0, 2, 3, 1], &[NAUTY_INFINITY, 0, NAUTY_INFINITY, 0], 2, &[0, 0, 0, 0], bitvec![usize, Msb0; 0; 4], 8; "diamond_unpartitioned")]
-    #[test_case(Graph::from_u32(&[1610612736, 2684354560, 3221225472]), &[0, 2, 1], &[2, NAUTY_INFINITY, 0], 2, 2, &[1, 0], bitvec![usize, Msb0; 1, 0, 0], 1431812424, &[0, 2, 1], &[2, NAUTY_INFINITY, 0], 2, &[1, 0], bitvec![usize, Msb0; 0; 3], 4; "3_2")]
-    #[test_case(Graph::from_u32(&[1610612736, 2684354560, 3221225472]), &[1, 0, 2], &[2, NAUTY_INFINITY, 0], 2, 2, &[0, 2], bitvec![usize, Msb0; 1, 0, 0], 1431812424, &[1, 0, 2], &[2, NAUTY_INFINITY, 0], 2, &[0, 2], bitvec![usize, Msb0; 0; 3], 4; "3_3")]
+    #[test_case(create_n_circle(3), &[0, 2, 1], &[2, NAUTY_INFINITY, 0], 2, 2, &[1, 0], bitvec![usize, Msb0; 1, 0, 0], 1431812424, &[0, 2, 1], &[2, NAUTY_INFINITY, 0], 2, &[1, 0], bitvec![usize, Msb0; 0; 3], 4; "3_2")]
+    #[test_case(create_n_circle(3), &[1, 0, 2], &[2, NAUTY_INFINITY, 0], 2, 2, &[0, 2], bitvec![usize, Msb0; 1, 0, 0], 1431812424, &[1, 0, 2], &[2, NAUTY_INFINITY, 0], 2, &[0, 2], bitvec![usize, Msb0; 0; 3], 4; "3_3")]
     #[test_case(Graph::no_edge(3), &[1, 0, 2], &[2, NAUTY_INFINITY, 0], 2, 2, &[0, 2], bitvec![usize, Msb0; 1, 0, 0], 1431812424, &[1, 2, 0], &[2, NAUTY_INFINITY, 0], 2, &[0, 2], bitvec![usize, Msb0; 0; 3], 4; "3_1")]
     #[test_case(Graph::no_edge(3), &[0, 2, 1], &[2, NAUTY_INFINITY, 0], 2, 2, &[1, 0], bitvec![usize, Msb0; 1, 0, 0], 21845, &[0, 1, 2], &[2, NAUTY_INFINITY, 0], 2, &[1, 0], bitvec![usize, Msb0; 0; 3], 4)]
     #[test_case(Graph::no_edge(4), &[0, 3, 2, 1], &[2, NAUTY_INFINITY, NAUTY_INFINITY, 0], 2, 2, &[1, 0], bitvec![usize, Msb0; 1, 0, 0, 0], 21845, &[0, 2, 1, 3], &[2, NAUTY_INFINITY, NAUTY_INFINITY, 0], 2, &[1, 0], bitvec![usize, Msb0; 0; 4], 4)]
@@ -454,8 +454,8 @@ mod test {
     }
 
     #[test_case(create_diamond(), &[0, 1, 2, 3], &[NAUTY_INFINITY, NAUTY_INFINITY, NAUTY_INFINITY, 0], 0, 1, &[4, 4, 4, 4], bitvec![usize, Msb0; 1; 4], 0, &[0, 2, 3, 1], &[NAUTY_INFINITY, 0, NAUTY_INFINITY, 0], 2, &[0, 0, 0, 0], bitvec![usize, Msb0; 0; 4], 8; "diamond_unpartitioned")]
-    #[test_case(Graph::from_u32(&[1610612736, 2684354560, 3221225472]), &[0, 2, 1], &[2, NAUTY_INFINITY, 0], 2, 2, &[1, 0], bitvec![usize, Msb0; 1, 0, 0], 1431812424, &[0, 2, 1], &[2, NAUTY_INFINITY, 0], 2, &[1, 0], bitvec![usize, Msb0; 0; 3], 4; "3_2")]
-    #[test_case(Graph::from_u32(&[1610612736, 2684354560, 3221225472]), &[1, 0, 2], &[2, NAUTY_INFINITY, 0], 2, 2, &[0, 2], bitvec![usize, Msb0; 1, 0, 0], 1431812424, &[1, 0, 2], &[2, NAUTY_INFINITY, 0], 2, &[0, 2], bitvec![usize, Msb0; 0; 3], 4; "3_3")]
+    #[test_case(create_n_circle(3), &[0, 2, 1], &[2, NAUTY_INFINITY, 0], 2, 2, &[1, 0], bitvec![usize, Msb0; 1, 0, 0], 1431812424, &[0, 2, 1], &[2, NAUTY_INFINITY, 0], 2, &[1, 0], bitvec![usize, Msb0; 0; 3], 4; "3_2")]
+    #[test_case(create_n_circle(3), &[1, 0, 2], &[2, NAUTY_INFINITY, 0], 2, 2, &[0, 2], bitvec![usize, Msb0; 1, 0, 0], 1431812424, &[1, 0, 2], &[2, NAUTY_INFINITY, 0], 2, &[0, 2], bitvec![usize, Msb0; 0; 3], 4; "3_3")]
     #[test_case(Graph::no_edge(3), &[1, 0, 2], &[2, NAUTY_INFINITY, 0], 2, 2, &[0, 2], bitvec![usize, Msb0; 1, 0, 0], 1431812424, &[1, 2, 0], &[2, NAUTY_INFINITY, 0], 2, &[0, 2], bitvec![usize, Msb0; 0; 3], 4; "3_1")]
     #[test_case(Graph::no_edge(3), &[0, 2, 1], &[2, NAUTY_INFINITY, 0], 2, 2, &[1, 0], bitvec![usize, Msb0; 1, 0, 0], 21845, &[0, 1, 2], &[2, NAUTY_INFINITY, 0], 2, &[1, 0], bitvec![usize, Msb0; 0; 3], 4)]
     #[test_case(Graph::no_edge(4), &[0, 3, 2, 1], &[2, NAUTY_INFINITY, NAUTY_INFINITY, 0], 2, 2, &[1, 0], bitvec![usize, Msb0; 1, 0, 0, 0], 21845, &[0, 2, 1, 3], &[2, NAUTY_INFINITY, NAUTY_INFINITY, 0], 2, &[1, 0], bitvec![usize, Msb0; 0; 4], 4)]
