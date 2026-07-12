@@ -1,6 +1,6 @@
 use crate::{
     nautil::SetWordNautilTrait,
-    nauty::{Graph, Set, SetTrait, partition_nest::Partition},
+    nauty::{Graph, Set, SetTrait, partition_nest::partition::Partition},
 };
 use cfor::cfor;
 
@@ -39,7 +39,21 @@ fn is_autom(g: &Graph, perm: &[usize]) -> bool {
     true
 }
 
+/// Algorithm 1, p. 8 https://arxiv.org/pdf/1301.1493
 ///
+/// while α is not empty and π is not discrete do
+///     Remove some element W from α.
+///     for each cell X of π do
+///         Let X1 , . . . , Xk be the fragments of X distinguished according
+///         to the number of edges from each vertex to W .
+///         Replace X by X1 , . . . , Xk in π.
+///         if X ∈ α then
+///             Replace X by X1 , . . . , Xk in α.
+///         else
+///             Add all but one of the largest of X1 , . . . , Xk to α.
+///         end
+///     end
+/// end
 ///
 ///    g: &mut Graph,   
 ///    lab: &mut [usize],        labels
@@ -371,8 +385,8 @@ mod test {
     use super::*;
     use crate::nauty::{
         NAUTY_INFINITY,
-        partition_nest::PartitionNest,
-        test::{create_diamond, create_n_circle, create_zero},
+        partition_nest::{self, PartitionNest},
+        test::{create_diamond, create_n_circle},
         u32_to_bitvec,
     };
     use bitvec::{bitvec, order::Msb0, vec::BitVec};
