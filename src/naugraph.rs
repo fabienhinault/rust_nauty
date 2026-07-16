@@ -2,6 +2,7 @@ use crate::{
     nautil::SetWordNautilTrait,
     nauty::{Graph, Set, SetTrait, partition_nest::partition::Partition},
 };
+use bitvec::{bitvec, order::Msb0};
 use cfor::cfor;
 
 struct NaugraphEnv {
@@ -80,7 +81,7 @@ fn refine_nest(
     let mut maxcell: isize;
     let mut maxpos: Option<usize> = None;
     let mut hint: usize;
-    let workperm: Vec<usize> = vec![0; g.n()];
+    let mut workperm: Vec<usize> = vec![0; g.n()];
     let mut bucket: Vec<usize> = vec![0; g.n() + 2];
 
     longcode = partition.numcells();
@@ -129,7 +130,7 @@ fn refine_nest(
             }
         /* nontrivial splitting cell */
         } else {
-            let mut workset: Set = Set::new();
+            let mut workset: Set = bitvec![usize, Msb0; 0; g.n()];
             for i in split1..=split2 {
                 workset.add_one(partition[i]);
             }
@@ -187,6 +188,10 @@ fn refine_nest(
                         }
                     }
                 }
+                for i in 0..cell.len() {
+                    workperm[bucket[count[i]]] = cell[i];
+                    bucket[count[i]] += 1;
+                }
                 for i in 1..cell.len() {
                     cell[i] = workperm[i];
                 }
@@ -226,7 +231,7 @@ fn refine(
 ) {
     let mut i: usize;
     let mut c1: usize;
-    let mut c2: usize;
+    let mut c2: isize;
     let mut labc1: usize;
     let mut split1: usize;
     let mut split2: usize;
@@ -239,7 +244,7 @@ fn refine(
     let mut maxcell: isize;
     let mut maxpos: Option<usize> = None;
     let mut hint: usize;
-    let workperm: Vec<usize> = vec![0; g.n()];
+    let mut workperm: Vec<usize> = vec![0; g.n()];
     let mut bucket: Vec<usize> = vec![0; g.n() + 2];
 
     longcode = *numcells;
@@ -274,29 +279,29 @@ fn refine(
                     continue;
                 }
                 c1 = cell1;
-                c2 = cell2;
-                while c1 <= c2 {
+                c2 = cell2 as isize;
+                while c1 as isize <= c2 {
                     labc1 = lab[c1];
                     if gptr[labc1] {
                         c1 +=1;
                     } else {
-                        lab[c1] = lab[c2];
-                        lab[c2] = labc1;
+                        lab[c1] = lab[c2 as usize];
+                        lab[c2 as usize] = labc1;
                         c2 -= 1;
                     }
                 }
-                if c2 >= cell1 && c1 <= cell2{
-                    ptn[c2] = level;
-                    longcode = mash(longcode, c2);
+                if c2 >= cell1 as isize && c1 <= cell2{
+                    ptn[c2 as usize] = level;
+                    longcode = mash(longcode, c2 as usize);
                     *numcells += 1;
-                    if active[cell1] || (c2-cell1 >= cell2-c1) {
+                    if active[cell1] || (c2 as usize - cell1 >= cell2-c1) {
                         active.add_one(c1);
                         if c1 == cell2 {
                             hint = c1;
                         }
                     } else {
                         active.add_one(cell1);
-                        if c2 == cell1 {
+                        if c2 as usize == cell1 {
                             hint = cell1;
                         }
                     }
@@ -304,7 +309,7 @@ fn refine(
             }}
         /* nontrivial splitting cell */
         } else {
-            let mut workset: Set = Set::new();
+            let mut workset: Set = bitvec![usize, Msb0; 0; g.n()];
             for i in split1..=split2 {
                 workset.add_one(lab[i]);
             }
@@ -343,11 +348,12 @@ fn refine(
                 }
                 c1 = cell1;
                 maxcell = -1;
+                let mut c2: usize;
                 for i in (bmin + 1)..=bmax {
                     if bucket[i] != 0 {
                         c2 = c1 + bucket[i];
                         bucket[i] = c1;
-                        longcode = mash(longcode,i+c1);
+                        longcode = mash(longcode, i + c1);
                         if (c2 - c1) as isize > maxcell {
                             maxcell = (c2 - c1) as isize;
                             maxpos = Some(c1);
@@ -364,6 +370,10 @@ fn refine(
                             c1 = c2;
                         }
                     }
+                }
+                for i in cell1..=cell2 {
+                    workperm[bucket[count[i]]] = lab[i];
+                    bucket[count[i]] += 1;
                 }
                 lab[(cell1 + 1)..(cell2 + 1)].copy_from_slice(&workperm[(cell1 + 1)..(cell2 + 1)]);
                 if !active[cell1] {
@@ -398,7 +408,9 @@ mod test {
         assert!(!is_autom(&create_n_circle(4), &[1, 0, 2, 3]));
     }
 
-    #[test_case(create_diamond(), &[0, 1, 2, 3], &[NAUTY_INFINITY, NAUTY_INFINITY, NAUTY_INFINITY, 0], 0, 1, &[4, 4, 4, 4], bitvec![usize, Msb0; 1; 4], 0, &[0, 2, 3, 1], &[NAUTY_INFINITY, 0, NAUTY_INFINITY, 0], 2, &[0, 0, 0, 0], bitvec![usize, Msb0; 0; 4], 8; "diamond_unpartitioned")]
+    #[test_case(Graph::from_u32(&[805306368, 402653184, 2281701376, 3221225472, 1610612736]),  &[1, 0, 3, 2, 4], &[2, NAUTY_INFINITY, NAUTY_INFINITY, NAUTY_INFINITY, 0], 2, 2, &[0, 4, 3, 2, 1], u32_to_bitvec(2147483648, 5), 1431812424, &[1, 4, 3, 2, 0], &[2, NAUTY_INFINITY, 2, NAUTY_INFINITY, 0], 3, &[0,1, 1, 1, 1], bitvec![usize, Msb0; 0; 5], 27427; "5_2")]
+    #[test_case(Graph::from_u32(&[805306368, 402653184, 2281701376, 3221225472, 1610612736]),  &[0, 4, 3, 2, 1], &[2, NAUTY_INFINITY, NAUTY_INFINITY, NAUTY_INFINITY, 0], 2, 2, &[3, 2, 1, 0,4], u32_to_bitvec(2147483648, 5), 21845, &[0, 2, 3, 1, 4], &[2, NAUTY_INFINITY, 2, NAUTY_INFINITY, 0], 3, &[3,1,1,1,1], bitvec![usize, Msb0; 0; 5], 27427; "5_1")]
+    #[test_case(create_diamond(), &[0, 1, 2, 3], &[NAUTY_INFINITY, NAUTY_INFINITY, NAUTY_INFINITY, 0], 0, 1, &[4, 4, 4, 4], bitvec![usize, Msb0; 1; 4], 0, &[0, 2, 3, 1], &[0, 0, NAUTY_INFINITY, 0], 2, &[3, 2, 0, 0], bitvec![usize, Msb0; 0; 4], 27493; "diamond_unpartitioned")]
     #[test_case(create_n_circle(3), &[0, 2, 1], &[2, NAUTY_INFINITY, 0], 2, 2, &[1, 0], bitvec![usize, Msb0; 1, 0, 0], 1431812424, &[0, 2, 1], &[2, NAUTY_INFINITY, 0], 2, &[1, 0], bitvec![usize, Msb0; 0; 3], 4; "3_2")]
     #[test_case(create_n_circle(3), &[1, 0, 2], &[2, NAUTY_INFINITY, 0], 2, 2, &[0, 2], bitvec![usize, Msb0; 1, 0, 0], 1431812424, &[1, 0, 2], &[2, NAUTY_INFINITY, 0], 2, &[0, 2], bitvec![usize, Msb0; 0; 3], 4; "3_3")]
     #[test_case(Graph::no_edge(3), &[1, 0, 2], &[2, NAUTY_INFINITY, 0], 2, 2, &[0, 2], bitvec![usize, Msb0; 1, 0, 0], 1431812424, &[1, 2, 0], &[2, NAUTY_INFINITY, 0], 2, &[0, 2], bitvec![usize, Msb0; 0; 3], 4; "3_1")]
@@ -453,7 +465,8 @@ mod test {
         assert_eq!(code, expected_code);
     }
 
-    #[test_case(create_diamond(), &[0, 1, 2, 3], &[NAUTY_INFINITY, NAUTY_INFINITY, NAUTY_INFINITY, 0], 0, 1, &[4, 4, 4, 4], bitvec![usize, Msb0; 1; 4], 0, &[0, 2, 3, 1], &[NAUTY_INFINITY, 0, NAUTY_INFINITY, 0], 2, &[0, 0, 0, 0], bitvec![usize, Msb0; 0; 4], 8; "diamond_unpartitioned")]
+    #[test_case(Graph::from_u32(&[805306368, 402653184, 2281701376, 3221225472, 1610612736]),  &[0, 4, 3, 2, 1], &[2, NAUTY_INFINITY, NAUTY_INFINITY, NAUTY_INFINITY, 0], 2, 2, &[3, 2, 1, 0,4], u32_to_bitvec(2147483648, 5), 21845, &[0, 2, 3, 1, 4], &[2, NAUTY_INFINITY, 2, NAUTY_INFINITY, 0], 3, &[3,1,1,1,1], bitvec![usize, Msb0; 0; 5], 27427; "5_1")]
+    #[test_case(create_diamond(), &[0, 1, 2, 3], &[NAUTY_INFINITY, NAUTY_INFINITY, NAUTY_INFINITY, 0], 0, 1, &[4, 4, 4, 4], bitvec![usize, Msb0; 1; 4], 0, &[0, 2, 3, 1], &[0, 0, NAUTY_INFINITY, 0], 2, &[3, 2, 0, 0], bitvec![usize, Msb0; 0; 4], 27493; "diamond_unpartitioned")]
     #[test_case(create_n_circle(3), &[0, 2, 1], &[2, NAUTY_INFINITY, 0], 2, 2, &[1, 0], bitvec![usize, Msb0; 1, 0, 0], 1431812424, &[0, 2, 1], &[2, NAUTY_INFINITY, 0], 2, &[1, 0], bitvec![usize, Msb0; 0; 3], 4; "3_2")]
     #[test_case(create_n_circle(3), &[1, 0, 2], &[2, NAUTY_INFINITY, 0], 2, 2, &[0, 2], bitvec![usize, Msb0; 1, 0, 0], 1431812424, &[1, 0, 2], &[2, NAUTY_INFINITY, 0], 2, &[0, 2], bitvec![usize, Msb0; 0; 3], 4; "3_3")]
     #[test_case(Graph::no_edge(3), &[1, 0, 2], &[2, NAUTY_INFINITY, 0], 2, 2, &[0, 2], bitvec![usize, Msb0; 1, 0, 0], 1431812424, &[1, 2, 0], &[2, NAUTY_INFINITY, 0], 2, &[0, 2], bitvec![usize, Msb0; 0; 3], 4; "3_1")]
