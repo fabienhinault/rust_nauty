@@ -759,6 +759,31 @@ pub mod test {
         result
     }
 
+    pub fn create_f<F>(n: usize, f: F) -> Graph
+    where
+        F: Fn(usize, usize) -> bool + Copy,
+    {
+        Graph((0..n).map(|i| create_f_bitvec(n, i, f)).collect())
+    }
+
+    pub fn create_f_bitvec<F>(n: usize, i: usize, f: F) -> BitVec<usize, Msb0>
+    where
+        F: Fn(usize, usize) -> bool + Copy,
+    {
+        let mut result: BitVec<usize, Msb0> = bitvec![usize, Msb0; 0; n];
+        for i_other_vertex in 0..n {
+            result.set(i_other_vertex, f(i, i_other_vertex));
+        }
+        result
+    }
+
+    pub fn create_star() -> Graph {
+        create_f(5, |i_current_vertex, i_other_vertex| {
+            i_other_vertex == (i_current_vertex + 1).rem_euclid(5)
+                || i_other_vertex == (i_current_vertex + 2).rem_euclid(5)
+        })
+    }
+
     //  0---1---2---3---4--- ... ---n
     fn create_n_path(n: usize) -> Graph {
         let mut first = bitvec![usize, Msb0; 0; n];
