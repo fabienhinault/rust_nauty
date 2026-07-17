@@ -225,9 +225,15 @@ impl Graph {
         Self(vec![bitvec![usize, Msb0; 0; 1]])
     }
 
+    pub fn new(vertex_count: usize) -> Self {
+        Self::no_edge(vertex_count)
+    }
+
     pub fn no_edge(vertex_count: usize) -> Self {
         Self(vec![bitvec![usize, Msb0; 0; vertex_count]; vertex_count])
     }
+
+    pub fn from_f(vertex_count: usize, f: fn(usize, usize, usize) -> bool) {}
 
     pub fn n(&self) -> usize {
         self.0.len()
@@ -671,13 +677,13 @@ pub mod test {
     #[test_case(create_n_circle(6))]
     #[test_case(create_diamond())]
     #[test_case(create_complete(4))]
-    #[test_case(create_g4g_bc())]
+    #[test_case(create_g4g_biconnected())]
     fn test_is_biconnected(biconnected_graph: Graph) {
         assert!(biconnected_graph.isbiconnected());
     }
 
     #[test_case(create_n_path(4))]
-    #[test_case(create_g4g_not_bc())]
+    #[test_case(create_g4g_not_biconnected())]
     #[test_case(create_D_7dC())]
     fn test_is_not_biconnected(not_biconnected_graph: Graph) {
         // println!("{}", not_biconnected_graph.to_graph6());
@@ -696,7 +702,7 @@ pub mod test {
 
     #[test]
     fn test_g4g_not_isbiconnected() {
-        assert!(!create_g4g_not_bc().isbiconnected());
+        assert!(!create_g4g_not_biconnected().isbiconnected());
     }
 
     #[test]
@@ -779,7 +785,7 @@ pub mod test {
 
     pub fn create_star() -> Graph {
         create_f(5, |i_current_vertex, i_other_vertex| {
-            i_other_vertex == (i_current_vertex + 1).rem_euclid(5)
+            i_other_vertex == (i_current_vertex + 3).rem_euclid(5)
                 || i_other_vertex == (i_current_vertex + 2).rem_euclid(5)
         })
     }
@@ -811,7 +817,7 @@ pub mod test {
         ])
     }
 
-    fn create_complete(n: usize) -> Graph {
+    pub fn create_complete(n: usize) -> Graph {
         Graph((0..n).map(|i| create_complete_bitvec(n, i)).collect())
     }
 
@@ -829,7 +835,7 @@ pub mod test {
     // 1-0--3
     // |/   |
     // 2    4
-    fn create_g4g_not_bc() -> Graph {
+    fn create_g4g_not_biconnected() -> Graph {
         Graph(vec![
             //                   0  1  2  3  4
             bitvec![usize, Msb0; 0, 1, 1, 1, 0],
@@ -843,7 +849,7 @@ pub mod test {
     //  1-0--3
     //  |/   |
     //  2----4
-    fn create_g4g_bc() -> Graph {
+    fn create_g4g_biconnected() -> Graph {
         Graph(vec![
             //                   0  1  2  3  4
             bitvec![usize, Msb0; 0, 1, 1, 1, 0],
