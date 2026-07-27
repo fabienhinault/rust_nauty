@@ -182,14 +182,19 @@ fn create_disconnected() -> Graph {
     ])
 }
 
-pub fn create_f(n: usize, f: fn(usize, usize, usize) -> bool) -> Graph {
-    Graph((0..n).map(|i| bitvec_from_f(n, i, f)).collect())
-}
-
-pub fn create_star() -> Graph {
-    create_f(5, |i_current_vertex, i_other_vertex, _n| {
+pub fn create_pentagram() -> Graph {
+    Graph::from_f(5, |i_current_vertex, i_other_vertex, _n| {
         i_other_vertex == (i_current_vertex + 3).rem_euclid(5)
             || i_other_vertex == (i_current_vertex + 2).rem_euclid(5)
+    })
+}
+
+pub fn create_from_offsets(vertices_count: usize, offsets: &[usize]) -> Graph {
+    Graph::from_closure(vertices_count, |i_current_vertex, i_other_vertex, n| {
+        offsets
+            .iter()
+            .map(|offset| (i_current_vertex + offset).rem_euclid(n))
+            .any(|offsetted| offsetted == i_other_vertex)
     })
 }
 
