@@ -1,3 +1,5 @@
+use std::num::NonZero;
+
 use super::{Partition, cell_mut::CellMut};
 
 #[must_use = "iterators are lazy and do nothing unless consumed"]
@@ -7,6 +9,11 @@ pub struct PartitionCellsIterMut<'a> {
 }
 
 // do not implement trait Iterator because of lifetime issue
+// between self.partition's lifetime and self in next().
+// ChunkByMut https://doc.rust-lang.org/stable/src/core/slice/iter.rs.html#3120
+// gets out of it by splitting self.slice
+// we could do the same for lab and ptn, like in PartitionCellsIter.
+// But numcells remains. (put it in a RefCell? Or remove it from PartitionNest and compute it when needed?)
 impl<'a> PartitionCellsIterMut<'a> {
     pub fn next<'b>(&'b mut self) -> Option<CellMut<'b>> {
         if self.index == self.partition.len() {
@@ -34,5 +41,12 @@ impl<'a> PartitionCellsIterMut<'a> {
                 numcells: &mut self.partition.nest.numcells[self.partition.level],
             })
         }
+    }
+
+    pub fn nth<'b>(&'b mut self, n: usize) -> Option<CellMut<'b>> {
+        for _i in 0..n {
+            self.next()?;
+        }
+        self.next()
     }
 }

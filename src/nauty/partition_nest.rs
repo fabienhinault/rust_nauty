@@ -13,7 +13,7 @@ mod partition_nest_chunk_by_mut;
 /// *    subinterval of [0,n-1] such that ptn[k] > x for i <= k < j and          *
 /// *    ptn[j] <= x.  The partition at level 0 is given to nauty by the user.   *
 /// *    This is  refined for the root of the tree, which has level 1.           *
-#[derive(Default, PartialEq)]
+#[derive(Default, PartialEq, Clone)]
 pub struct PartitionNest {
     /// lab must always be a permutation of [[0, n-1]]
     lab: Vec<usize>,

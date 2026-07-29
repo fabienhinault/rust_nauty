@@ -464,7 +464,15 @@ impl VecMap {
     }
 
     pub fn get(&self, index: usize) -> usize {
-        self.0[index].unwrap()
+        self.get_safely(index).unwrap()
+    }
+
+    pub fn get_safely(&self, index: usize) -> Option<usize> {
+        if index >= self.0.len() {
+            None
+        } else {
+            self.0[index]
+        }
     }
 
     pub fn set(&mut self, index: usize, value: usize) {
@@ -472,6 +480,12 @@ impl VecMap {
             self.0.push(None);
         }
         self.0[index] = Some(value);
+    }
+
+    pub fn increment(&mut self, index: usize) {
+        if let Some(v) = &mut self.0[index] {
+            *v += 1;
+        }
     }
 }
 

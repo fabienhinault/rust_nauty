@@ -1,4 +1,8 @@
+use crate::nauty::VecMap;
+
 use super::Partition;
+use super::cell_mut::CellMut;
+use std::ops::Index;
 
 pub struct Cell<'a> {
     pub(crate) partition: &'a Partition,
@@ -18,5 +22,13 @@ impl<'a> Cell<'a> {
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.cell_lab.is_empty()
+    }
+}
+
+impl<'a> Index<usize> for Cell<'a> {
+    type Output = usize;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.cell_lab[index]
     }
 }

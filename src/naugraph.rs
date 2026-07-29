@@ -113,7 +113,7 @@ fn refine_nest(
                 }
                 let i = cell.partition_in_place_orig(gptr);
                 if i > 0 && i < cell.len() {
-                    cell.split(i - 1);
+                    cell.split_trivial(i - 1);
                     longcode = mash(longcode, cell.partition_index(i - 1));
                     if active[cell.partition_index(i)] || 2 * i >= cell.len() {
                         active.add_one(cell.partition_index(i));
@@ -183,7 +183,7 @@ fn refine_nest(
                             }
                         }
                         if c2 < cell.len() {
-                            cell.split(c2 - 1);
+                            cell.split_trivial(c2 - 1);
                             c1 = c2;
                         }
                     }
