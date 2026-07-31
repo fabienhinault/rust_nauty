@@ -1,7 +1,6 @@
-use crate::nauty::VecMap;
-
 use super::Partition;
-use super::cell_mut::CellMut;
+use crate::nauty::Set;
+use crate::nauty::SetTrait;
 use std::ops::Index;
 
 pub struct Cell<'a> {
@@ -22,6 +21,14 @@ impl<'a> Cell<'a> {
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.cell_lab.is_empty()
+    }
+
+    pub fn get_splitters(&self) -> Set {
+        let mut set = Set::new();
+        for i in self.cell_lab {
+            set.add_one(*i);
+        }
+        set
     }
 }
 

@@ -1,4 +1,4 @@
-use crate::nauty::{Set, VecMap};
+use crate::nauty::{Graph, Set, VecMap};
 use std::ops::{Index, IndexMut};
 
 /// https://doc.rust-lang.org/src/core/iter/traits/iterator.rs.html#2334-2337
@@ -75,6 +75,21 @@ where
     true_count
 }
 
+/// struct of results of a given function on a usize range.
+/// Used internally for cell split.
+struct FResults {
+    f_results: Vec<usize>,
+    f_antecedant_counts: VecMap,
+    min: usize,
+    max: usize,
+}
+
+impl FResults {
+    fn is_empty(&self) -> bool {
+        self.min == self.max
+    }
+}
+
 pub struct CellMut<'a> {
     pub(crate) level: usize,
     pub(crate) first_lab_index: usize,
@@ -138,15 +153,35 @@ impl<'a> CellMut<'a> {
     }
 
     pub fn split_from_fn<F: FnMut(&usize) -> usize>(&mut self, f: F) {
+        let f_results = self.get_f_results(f);
+        if f_results.is_empty() {
+            return;
+        }
+        self.split_from_f_results(f_results);
+    }
+
+    fn get_f_results<F: FnMut(&usize) -> usize>(&self, f: F) -> FResults {
         let (min, max, f_results, f_antecedant_counts) = self
             .iter()
             .map(f)
             .fold((None, None, vec![], VecMap::new()), fold_step);
         let min = min.expect("min");
         let max = max.expect("max");
-        if min == max {
-            return;
+        FResults {
+            f_results,
+            f_antecedant_counts,
+            min,
+            max,
         }
+    }
+
+    fn split_from_f_results(&mut self, f_results: FResults) {
+        let FResults {
+            f_results,
+            f_antecedant_counts,
+            min,
+            max,
+        } = f_results;
         let mut f_value_indices = VecMap::new();
         let mut current_f_value_index: usize = 0;
         for f_value in min..=max {
@@ -167,6 +202,16 @@ impl<'a> CellMut<'a> {
             f_value_indices.increment(*result);
         }
         self.copy_from_slice(&new_lab);
+    }
+
+    pub fn split_from_cell(&mut self, splitters: &Set, g: &Graph) {
+        let f_results = self.get_f_results(|i: &usize| {
+            (splitters.clone() & g.0[self.cell_lab[*i]].clone()).count_ones()
+        });
+        if f_results.is_empty() {
+            return;
+        }
+        self.split_from_f_results(f_results);
     }
 }
 
@@ -205,9 +250,10 @@ mod test {
     use super::*;
     use crate::nauty::NAUTY_INFINITY;
     use crate::nauty::partition_nest::PartitionNest;
+    use crate::nauty::test::create_from_offsets;
 
     #[test]
-    fn test() {
+    fn test_split_from_fn() {
         let nest = PartitionNest::new(
             vec![0, 3, 4, 2, 1, 6, 5],
             vec![
@@ -226,6 +272,39 @@ mod test {
         let mut cell_mut = cells_mut.nth(2).unwrap();
         let f = |vertex: &usize| if [1, 6].contains(vertex) { 1 } else { 0 };
         cell_mut.split_from_fn(f);
+        assert_eq!(partition.numcells(), 4);
+        assert_eq!(
+            partition.nest.clone(),
+            PartitionNest::new(
+                vec![0, 3, 4, 2, 5, 1, 6],
+                vec![2, NAUTY_INFINITY, 2, NAUTY_INFINITY, 2, NAUTY_INFINITY, 0],
+            )
+        );
+    }
+
+    #[test]
+    fn test_split_from_cell() {
+        let nest = PartitionNest::new(
+            vec![0, 3, 4, 2, 1, 6, 5],
+            vec![
+                2,
+                NAUTY_INFINITY,
+                2,
+                NAUTY_INFINITY,
+                NAUTY_INFINITY,
+                NAUTY_INFINITY,
+                0,
+            ],
+        );
+        let mut partition = nest.partition(2);
+        assert_eq!(partition.numcells(), 3);
+        let mut cells = partition.cells();
+        let cell = cells.nth(1).unwrap();
+        let splitters = cell.get_splitters();
+        let mut cells_mut = partition.cells_mut();
+        let mut cell_mut = cells_mut.nth(2).unwrap();
+        let g = create_from_offsets(7, &[3, 4]);
+        cell_mut.split_from_cell(&splitters, &g);
         assert_eq!(partition.numcells(), 4);
         assert_eq!(
             partition.nest.clone(),
