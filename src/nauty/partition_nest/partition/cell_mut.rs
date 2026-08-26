@@ -161,10 +161,10 @@ impl<'a> CellMut<'a> {
     }
 
     fn get_f_results<F: FnMut(&usize) -> usize>(&self, f: F) -> FResults {
-        let (min, max, f_results, f_antecedant_counts) = self
+        let f_results: Vec<usize> = self.iter().map(f).collect();
+        let (min, max, f_antecedant_counts) = f_results
             .iter()
-            .map(f)
-            .fold((None, None, vec![], VecMap::new()), fold_step);
+            .fold((None, None, VecMap::new()), fold_step);
         let min = min.expect("min");
         let max = max.expect("max");
         FResults {
@@ -204,10 +204,12 @@ impl<'a> CellMut<'a> {
         self.copy_from_slice(&new_lab);
     }
 
+    fn splitters_count(&self, splitters: &Set, g: &Graph, i: usize) -> usize {
+        (splitters.clone() & g.0[i].clone()).count_ones()
+    }
+
     pub fn split_from_cell(&mut self, splitters: &Set, g: &Graph) {
-        let f_results = self.get_f_results(|i: &usize| {
-            (splitters.clone() & g.0[self.cell_lab[*i]].clone()).count_ones()
-        });
+        let f_results = self.get_f_results(|i: &usize| self.splitters_count(splitters, g, *i));
         if f_results.is_empty() {
             return;
         }
@@ -216,17 +218,15 @@ impl<'a> CellMut<'a> {
 }
 
 fn fold_step(
-    acc: (Option<usize>, Option<usize>, Vec<usize>, VecMap),
-    x: usize,
-) -> (Option<usize>, Option<usize>, Vec<usize>, VecMap) {
-    let (min, max, mut f_results, mut f_antecedant_counts) = acc;
-    f_results.push(x);
+    acc: (Option<usize>, Option<usize>, VecMap),
+    &x: &usize,
+) -> (Option<usize>, Option<usize>, VecMap) {
+    let (min, max, mut f_antecedant_counts) = acc;
     let c = f_antecedant_counts.get_safely(x).unwrap_or(0);
     f_antecedant_counts.set(x, c + 1);
     (
         min.map_or(Some(x), |m: usize| Some(m.min(x))),
         max.map_or(Some(x), |m: usize| Some(m.max(x))),
-        f_results,
         f_antecedant_counts,
     )
 }
