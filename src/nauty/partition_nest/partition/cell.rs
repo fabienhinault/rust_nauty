@@ -1,6 +1,7 @@
 use super::Partition;
 use crate::nauty::Set;
 use crate::nauty::SetTrait;
+use bitvec::{bitvec, order::Msb0};
 use std::ops::Index;
 
 pub struct Cell<'a> {
@@ -24,9 +25,9 @@ impl<'a> Cell<'a> {
     }
 
     pub fn get_splitters(&self) -> Set {
-        let mut set = Set::new();
+        let mut set = bitvec![usize, Msb0; 0; self.partition.nest.lab.len()];
         for i in self.cell_lab {
-            set.add_one(*i);
+            set.set(*i, true);
         }
         set
     }

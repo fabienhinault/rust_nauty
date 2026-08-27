@@ -85,7 +85,7 @@ struct FResults {
 }
 
 impl FResults {
-    fn is_empty(&self) -> bool {
+    fn is_const(&self) -> bool {
         self.min == self.max
     }
 }
@@ -154,7 +154,7 @@ impl<'a> CellMut<'a> {
 
     pub fn split_from_fn<F: FnMut(&usize) -> usize>(&mut self, f: F) {
         let f_results = self.get_f_results(f);
-        if f_results.is_empty() {
+        if f_results.is_const() {
             return;
         }
         self.split_from_f_results(f_results);
@@ -210,7 +210,7 @@ impl<'a> CellMut<'a> {
 
     pub fn split_from_cell(&mut self, splitters: &Set, g: &Graph) {
         let f_results = self.get_f_results(|i: &usize| self.splitters_count(splitters, g, *i));
-        if f_results.is_empty() {
+        if f_results.is_const() {
             return;
         }
         self.split_from_f_results(f_results);
