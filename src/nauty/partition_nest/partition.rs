@@ -1,12 +1,14 @@
-use crate::nauty::partition_nest::partition::cell::Cell;
-use crate::nauty::partition_nest::partition::cell_mut::CellMut;
-
 use super::PartitionNest;
 use super::partition_nest_chunk_by::PartitionNestChunkBy;
+use crate::nauty::Set;
+use crate::nauty::partition_nest::partition::cell::Cell;
+use crate::nauty::partition_nest::partition::cell_mut::CellMut;
+use bitvec::bitvec;
+use bitvec::order::Msb0;
 use std::ops::Index;
 
 mod cell;
-mod cell_mut;
+pub mod cell_mut;
 mod partition_cells_iter;
 mod partition_cells_iter_mut;
 mod partition_subset;
@@ -38,6 +40,14 @@ impl Partition {
             end += 1;
         }
         end
+    }
+
+    pub fn get_splitters(&self, start: usize) -> Set {
+        let mut set = bitvec![usize, Msb0; 0; self.nest.lab.len()];
+        for i in start..=self.cell_end(start) {
+            set.set(self.nest.lab[i], true);
+        }
+        set
     }
 
     pub fn raw_cells(&self) -> PartitionNestChunkBy<'_> {

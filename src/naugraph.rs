@@ -1,9 +1,13 @@
 use crate::{
     nautil::SetWordNautilTrait,
-    nauty::{Graph, Set, SetTrait, partition_nest::partition::Partition},
+    nauty::{
+        Graph, Set, SetTrait,
+        partition_nest::partition::{Partition, cell_mut::SplitResult},
+    },
 };
 use bitvec::{bitvec, order::Msb0};
 use cfor::cfor;
+use itertools::Itertools;
 
 struct NaugraphEnv {
     pub workset: Vec<Set>,
@@ -102,6 +106,7 @@ fn refine_nest(
         }
         active.remove_one(split1);
         split2 = partition.cell_end(split1);
+        let splitters = partition.get_splitters(split1);
         longcode = mash(longcode, split1 + split2);
         /* trivial splitting cell */
         if split1 == split2 {
@@ -111,9 +116,8 @@ fn refine_nest(
                 if cell.len() == 1 {
                     continue;
                 }
-                let i = cell.partition_in_place_orig(gptr);
+                let i = cell.split_trivial(gptr);
                 if i > 0 && i < cell.len() {
-                    cell.split_trivial(i - 1);
                     longcode = mash(longcode, cell.partition_index(i - 1));
                     if active[cell.partition_index(i)] || 2 * i >= cell.len() {
                         active.add_one(cell.partition_index(i));
@@ -137,68 +141,34 @@ fn refine_nest(
             longcode = mash(longcode, split2 - split1 + 1);
             let mut cells = partition.cells_mut();
             while let Some(mut cell) = cells.next() {
-                let mut c1: usize;
-                let mut c2: usize;
                 if cell.len() == 1 {
                     continue;
                 }
-                i = 0;
-                cnt = (workset.clone() & g.0[cell[i]].clone()).count_ones();
-                count[cell.partition_index(i)] = cnt;
-                bmin = cnt;
-                bmax = cnt;
-                bucket[cnt] = 1;
-                for i in 1..cell.len() {
-                    cnt = (workset.clone() & g.0[cell[i]].clone()).count_ones();
-                    while bmin > cnt {
-                        bmin -= 1;
-                        bucket[bmin] = 0;
+                match cell.split_from_splitters(&splitters, g) {
+                    SplitResult::Const(bmin) => {
+                        longcode = mash(longcode, bmin + cell.partition_index(0));
+                        continue;
                     }
-                    while bmax < cnt {
-                        bmax += 1;
-                        bucket[bmax] = 0;
-                    }
-                    bucket[cnt] += 1;
-                    count[cell.partition_index(i)] = cnt;
-                }
-                if bmin == bmax {
-                    longcode = mash(longcode, bmin + cell.partition_index(0));
-                    continue;
-                }
-                c1 = 0;
-                maxcell = -1;
-                for i in bmin..=bmax {
-                    if bucket[i] != 0 {
-                        c2 = c1 + bucket[i];
-                        bucket[i] = cell.partition_index(c1);
-                        longcode = mash(longcode, i + cell.partition_index(c1));
-                        if (c2 - c1) as isize > maxcell {
-                            maxcell = (c2 - c1) as isize;
-                            maxpos = Some(c1);
-                        }
-                        if c1 != 0 {
-                            active.add_one(cell.partition_index(c1));
-                            if c2 - c1 == 1 {
-                                hint = c1;
+                    SplitResult::Split {
+                        biggest_cell_pos,
+                        cells_indices,
+                        cells_values,
+                    } => {
+                        for ((c1, c2), value) in
+                            cells_indices.into_iter().tuple_windows().zip(cells_values)
+                        {
+                            longcode = mash(longcode, value + cell.partition_index(c1));
+                            if c1 != 0 {
+                                active.add_one(cell.partition_index(c1));
+                                if c2 - c1 == 1 {
+                                    hint = c1;
+                                }
                             }
                         }
-                        if c2 < cell.len() {
-                            cell.split_trivial(c2 - 1);
-                            c1 = c2;
+                        if !active[cell.partition_index(0)] {
+                            active.add_one(cell.partition_index(0));
+                            active.remove_one(cell.partition_index(biggest_cell_pos));
                         }
-                    }
-                }
-                for i in 0..cell.len() {
-                    workperm[bucket[count[cell.partition_index(i)]]] = cell[i];
-                    bucket[count[cell.partition_index(i)]] += 1;
-                }
-                for i in 1..cell.len() {
-                    cell[i] = workperm[cell.partition_index(i)];
-                }
-                if !active[cell.partition_index(0)] {
-                    active.add_one(cell.partition_index(0));
-                    if let Some(maxpos) = maxpos {
-                        active.remove_one(cell.partition_index(maxpos));
                     }
                 }
             }

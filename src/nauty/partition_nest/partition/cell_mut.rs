@@ -1,5 +1,8 @@
-use crate::nauty::{Graph, Set, VecMap};
-use std::ops::{Index, IndexMut};
+use crate::nauty::{Graph, Set, VecMap, partition_nest::partition::cell::Cell};
+use std::{
+    iter::once,
+    ops::{Index, IndexMut},
+};
 
 /// https://doc.rust-lang.org/src/core/iter/traits/iterator.rs.html#2334-2337
 ///
@@ -85,8 +88,8 @@ struct FResults {
 }
 
 impl FResults {
-    fn is_const(&self) -> bool {
-        self.min == self.max
+    fn is_const(&self) -> Option<usize> {
+        (self.min == self.max).then_some(self.min)
     }
 }
 
@@ -112,7 +115,7 @@ impl<'a> CellMut<'a> {
         self.cell_lab.swap(a, b)
     }
 
-    pub fn split_trivial(&mut self, i: usize) {
+    pub fn raw_split(&mut self, i: usize) {
         self.cell_ptn[i] = self.level;
         *self.numcells += 1;
     }
@@ -148,16 +151,24 @@ impl<'a> CellMut<'a> {
         c1
     }
 
+    pub fn split_trivial(&mut self, splitter_neighbours: &Set) -> usize {
+        let i = self.partition_in_place_orig(splitter_neighbours);
+        if i > 0 && i < self.len() {
+            self.raw_split(i - 1);
+        }
+        i
+    }
+
     pub fn iter(&self) -> std::slice::Iter<'_, usize> {
         self.cell_lab.iter()
     }
 
-    pub fn split_from_fn<F: FnMut(&usize) -> usize>(&mut self, f: F) {
+    pub fn split_from_fn<F: FnMut(&usize) -> usize>(&mut self, f: F) -> SplitResult {
         let f_results = self.get_f_results(f);
-        if f_results.is_const() {
-            return;
+        if let Some(value) = f_results.is_const() {
+            return SplitResult::Const(value);
         }
-        self.split_from_f_results(f_results);
+        self.split_from_f_results(f_results)
     }
 
     fn get_f_results<F: FnMut(&usize) -> usize>(&self, f: F) -> FResults {
@@ -175,7 +186,7 @@ impl<'a> CellMut<'a> {
         }
     }
 
-    fn split_from_f_results(&mut self, f_results: FResults) {
+    fn split_from_f_results(&mut self, f_results: FResults) -> SplitResult {
         let FResults {
             f_results,
             f_antecedant_counts,
@@ -184,8 +195,14 @@ impl<'a> CellMut<'a> {
         } = f_results;
         let mut f_value_indices = VecMap::new();
         let mut current_f_value_index: usize = 0;
+        let mut biggest_cell_size = 0;
+        let mut biggest_cell_pos = None;
         for f_value in min..=max {
             if let Some(count) = f_antecedant_counts.get_safely(f_value) {
+                if count > biggest_cell_size {
+                    biggest_cell_size = count;
+                    biggest_cell_pos = Some(current_f_value_index);
+                }
                 f_value_indices.set(f_value, current_f_value_index);
                 if current_f_value_index != 0 {
                     *self.numcells += 1;
@@ -196,25 +213,51 @@ impl<'a> CellMut<'a> {
                 }
             }
         }
+        let result = SplitResult::Split {
+            biggest_cell_pos: biggest_cell_pos.expect("biggest_cell_pos"),
+            cells_indices: f_value_indices
+                .0
+                .iter()
+                .flatten()
+                .copied()
+                .chain(once(self.len()))
+                .collect(),
+            cells_values: f_value_indices
+                .0
+                .iter()
+                .enumerate()
+                .filter_map(|(i, o)| o.map(|_| i))
+                .collect(),
+        };
         let mut new_lab = vec![0; self.len()];
         for (result, lab) in f_results.iter().zip(self.iter()) {
             new_lab[f_value_indices.get(*result)] = *lab;
             f_value_indices.increment(*result);
         }
         self.copy_from_slice(&new_lab);
+        result
     }
 
     fn splitters_count(&self, splitters: &Set, g: &Graph, i: usize) -> usize {
         (splitters.clone() & g.0[i].clone()).count_ones()
     }
 
-    pub fn split_from_cell(&mut self, splitters: &Set, g: &Graph) {
+    pub fn split_from_splitters(&mut self, splitters: &Set, g: &Graph) -> SplitResult {
         let f_results = self.get_f_results(|i: &usize| self.splitters_count(splitters, g, *i));
-        if f_results.is_const() {
-            return;
+        if let Some(value) = f_results.is_const() {
+            return SplitResult::Const(value);
         }
-        self.split_from_f_results(f_results);
+        self.split_from_f_results(f_results)
     }
+}
+
+pub enum SplitResult {
+    Const(usize),
+    Split {
+        biggest_cell_pos: usize,
+        cells_indices: Vec<usize>,
+        cells_values: Vec<usize>,
+    },
 }
 
 fn fold_step(
@@ -304,7 +347,7 @@ mod test {
         let mut cells_mut = partition.cells_mut();
         let mut cell_mut = cells_mut.nth(2).unwrap();
         let g = create_from_offsets(7, &[3, 4]);
-        cell_mut.split_from_cell(&splitters, &g);
+        cell_mut.split_from_splitters(&splitters, &g);
         assert_eq!(partition.numcells(), 4);
         assert_eq!(
             partition.nest.clone(),

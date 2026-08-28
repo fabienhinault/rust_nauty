@@ -1,6 +1,5 @@
 use super::Partition;
 use crate::nauty::Set;
-use crate::nauty::SetTrait;
 use bitvec::{bitvec, order::Msb0};
 use std::ops::Index;
 

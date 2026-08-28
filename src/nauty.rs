@@ -141,6 +141,7 @@ pub trait SetTrait {
     fn except_one(&self, index: usize) -> Self;
     fn filter(&self, other: &Self) -> Self;
     fn ones_iter(&self) -> SetIterator;
+    fn rounding_ones_iter(&self, hint: usize) -> RoundingSetIterator;
     fn bit_mask(&self, pos: usize) -> Self;
     fn masked(&self, pos: usize) -> Self;
 }
@@ -178,6 +179,13 @@ impl SetTrait for Set {
         SetIterator { set: self.clone() }
     }
 
+    fn rounding_ones_iter(&self, hint: usize) -> RoundingSetIterator {
+        RoundingSetIterator {
+            set: self.clone(),
+            current_index: hint,
+        }
+    }
+
     fn bit_mask(&self, pos: usize) -> Self {
         let mut result = bitvec![usize, Msb0; 0; pos];
         result.extend_from_bitslice(self[0..self.len() - pos].iter().as_bitslice());
@@ -186,6 +194,28 @@ impl SetTrait for Set {
 
     fn masked(&self, pos: usize) -> Self {
         self.filter(&self.bit_mask(pos))
+    }
+}
+
+pub struct RoundingSetIterator {
+    set: Set,
+    current_index: usize,
+}
+
+impl Iterator for RoundingSetIterator {
+    type Item = usize;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let setwd: Set = self.set.bit_mask(self.current_index);
+        let mut lz = setwd.leading_zeros();
+        if lz == setwd.len() {
+            lz = self.set.leading_zeros();
+        }
+        if lz == self.set.len() {
+            return None;
+        }
+        self.current_index = (lz + 1) % self.set.len();
+        Some(lz)
     }
 }
 
