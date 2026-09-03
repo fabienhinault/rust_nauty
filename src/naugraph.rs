@@ -342,6 +342,31 @@ fn refine(
     *code = cleanup(longcode);
 }
 
+// pub fn bestcell(g: &Graph, partition: &Partition) -> usize {
+//     let i: usize = 0;
+//     let gp: &Set;
+//     let v1: usize;
+//     let v2: usize;
+//     let nnt: usize = 0;
+
+//     let workperm = partition.non_singleton_starts();
+//     if workperm.is_empty() {
+//         return g.n();
+//     }
+//     let bucket = vec![0; workperm.len()];
+// }
+
+pub fn targetcell(g: &Graph, partition: &Partition, hint: Option<usize>) -> usize {
+    let i: usize;
+    match hint {
+        Some(hint)
+            if !partition.is_cell_end(hint) && (hint == 0 || partition.is_cell_end(hint - 1)) =>
+        {
+            hint
+        }
+        _ => 0,
+    }
+}
 #[cfg(test)]
 mod test {
     use super::*;

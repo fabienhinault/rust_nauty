@@ -311,6 +311,15 @@ impl Graph {
         )
     }
 
+    pub fn from_edges(vertex_count: usize, edges: &[(usize, usize)]) -> Self {
+        let mut g = Self::no_edge(vertex_count);
+        for (v0, v1) in edges {
+            g.0[*v0].add_one(*v1);
+            g.0[*v1].add_one(*v0);
+        }
+        g
+    }
+
     pub fn from_closure<F: Fn(usize, usize, usize) -> bool + Copy>(
         vertex_count: usize,
         f: F,

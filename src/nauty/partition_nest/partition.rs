@@ -1,8 +1,8 @@
 use super::PartitionNest;
 use super::partition_nest_chunk_by::PartitionNestChunkBy;
-use crate::nauty::Set;
 use crate::nauty::partition_nest::partition::cell::Cell;
 use crate::nauty::partition_nest::partition::cell_mut::CellMut;
+use crate::nauty::{Graph, Set};
 use bitvec::bitvec;
 use bitvec::order::Msb0;
 use std::ops::Index;
@@ -41,10 +41,14 @@ impl Partition {
         self.nest.ptn.iter().all(|i| *i <= self.level)
     }
 
+    pub fn is_cell_end(&self, i: usize) -> bool {
+        self.nest.ptn[i] <= self.level
+    }
+
     /// last index of cell containing i for partition of given level
     pub fn cell_end(&self, i: usize) -> usize {
         let mut end = i;
-        while self.nest.ptn[end] > self.level {
+        while !self.is_cell_end(end) {
             end += 1;
         }
         end
@@ -67,6 +71,13 @@ impl Partition {
             partition: self,
             index: 0,
         }
+    }
+
+    pub fn non_singleton_starts(&self) -> Vec<usize> {
+        self.cells()
+            .filter(|c| c.len() > 1)
+            .map(|c| c.first_lab_index)
+            .collect()
     }
 
     pub fn cells_mut(&mut self) -> partition_cells_iter_mut::PartitionCellsIterMut<'_> {
@@ -105,6 +116,31 @@ impl Partition {
             numcells: &mut self.nest.numcells[self.level],
         }
     }
+
+    pub fn bestcell(&self, g: &Graph) -> Cell {
+        let non_singleton_cells: Vec<Cell> = self.cells().filter(|c| c.len() > 1).collect();
+        let mut neighbours_counts: Vec<usize> = vec![0; non_singleton_cells.len()];
+        for v2 in 0..non_singleton_cells.len() {
+            let workset = non_singleton_cells[v2].set(g);
+            for v1 in 0..v2 {
+                // Q why do we test only the first vertex of non_singleton_cells[v1]?
+                let gp = &g.0[non_singleton_cells[v1][0]];
+                let set1 = workset.clone() & gp.clone();
+                let set2 = workset.clone() & !gp.clone();
+                if set1.any() && set2.any() {
+                    neighbours_counts[v1] += 1;
+                    neighbours_counts[v2] += 1;
+                }
+            }
+        }
+        non_singleton_cells
+            .into_iter()
+            .zip(neighbours_counts)
+            .rev()
+            .max_by(|(_, cnt0), (_, cnt1)| cnt0.cmp(cnt1))
+            .map(|(cell, _)| cell)
+            .expect("bestcell")
+    }
 }
 
 impl Index<usize> for Partition {
@@ -118,7 +154,7 @@ impl Index<usize> for Partition {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::nauty::partition_nest::partition::Partition;
+    use crate::nauty::{NAUTY_INFINITY, partition_nest::partition::Partition};
 
     const LAB: &[usize] = &[4, 6, 2, 0, 8, 7, 5, 9, 3, 1];
     const PTN: &[usize] = &[4, 3, 4, 1, 2, 4, 4, 0, 2, 0];
@@ -137,5 +173,19 @@ mod test {
         assert!(!partition3.is_discrete());
         assert_eq!(partition3.numcells(), 6);
         assert_eq!(partition3.string(), "4, 6 | 2, 0 | 8 | 7, 5, 9 | 3 | 1");
+    }
+
+    #[test]
+    fn test_best_cell() {
+        // let g = Graph::from_u32(&[201326592, 67108864, 0, 0, 2147483648, 3221225472]);
+        let g = Graph::from_edges(6, &[(0, 4), (0, 5), (1, 5)]);
+        // println!("{}", g.to_matrix());
+        // E?b? // println!("{}", g.to_graph6());
+        let nest = PartitionNest::new(
+            [2, 3, 1, 4, 5, 0].to_vec(),
+            [NAUTY_INFINITY, 0, NAUTY_INFINITY, 0, NAUTY_INFINITY, 0].to_vec(),
+        );
+        let partition = Partition::new(nest, 1);
+        assert_eq!(partition.bestcell(&g).first_lab_index, 2);
     }
 }

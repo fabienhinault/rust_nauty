@@ -101,3 +101,15 @@ pub fn doref_nest(
     refine_nest(g, partition, active, code);
     *qinvar = 0;
 }
+
+pub fn maketargetcell(
+    g: &Graph,
+    partition: &Partition,
+    tcell: &mut Set,
+    tc_level: usize,
+    hint: usize,
+) {
+    let i: usize;
+    let j: usize;
+    let k: usize;
+}

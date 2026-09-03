@@ -1,5 +1,5 @@
 use super::Partition;
-use crate::nauty::Set;
+use crate::nauty::{Graph, Set, SetTrait};
 use bitvec::{bitvec, order::Msb0};
 use std::ops::Index;
 
@@ -29,6 +29,15 @@ impl<'a> Cell<'a> {
             set.set(*i, true);
         }
         set
+    }
+
+    pub fn iter(&self) -> std::slice::Iter<'_, usize> {
+        self.cell_lab.iter()
+    }
+
+    pub fn set(&self, g: &Graph) -> Set {
+        self.iter()
+            .fold(Set::zeros(g.n()), |acc, i| acc & g.0[*i].clone())
     }
 }
 
