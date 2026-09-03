@@ -68,7 +68,7 @@ fn is_autom(g: &Graph, perm: &[usize]) -> bool {
 ///    count: &mut Vec<usize>,   number of vertices in cells
 ///    active: &mut Set,         vertices not fixed yet
 ///    code: &mut usize,         
-fn refine_nest(g: &mut Graph, partition: &mut Partition, active: &mut Set, code: &mut usize) {
+pub fn refine_nest(g: &mut Graph, partition: &mut Partition, active: &mut Set, code: &mut usize) {
     let mut split1: usize;
     let mut split2: usize;
     let mut longcode: usize;

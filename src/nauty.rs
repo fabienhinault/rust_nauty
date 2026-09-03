@@ -46,11 +46,12 @@ use crate::{
         g6error::G6Error,
         g6string::{G6String, graph_size},
     },
+    nautil::doref_nest,
+    nauty::partition_nest::{PartitionNest, partition::Partition},
 };
 use bitvec::{bitvec, order::Msb0, vec::BitVec, view::BitView};
 use std::fmt::Debug;
 use std::{
-    collections::LinkedList,
     fs::File,
     ops::{Index, IndexMut},
 };
@@ -135,6 +136,7 @@ pub type NautyCounter = u128;
 pub trait SetTrait {
     fn difference(&self, other: &Self) -> Self;
     fn first_bit_nz_index(&self) -> usize;
+    fn zeros(n: usize) -> Self;
     fn one(index: usize) -> Self;
     fn add_one(&mut self, index: usize);
     fn remove_one(&mut self, index: usize);
@@ -165,6 +167,10 @@ impl SetTrait for Set {
 
     fn first_bit_nz_index(&self) -> usize {
         self.leading_zeros()
+    }
+
+    fn zeros(n: usize) -> Self {
+        bitvec![usize, Msb0; 0; n]
     }
 
     fn one(index: usize) -> Self {
@@ -583,7 +589,7 @@ fn nauty(
     g_arg: Graph,
     lab: &mut [usize],
     ptn: &mut [usize],
-    active_arg: &[Set],
+    active_arg: &Set,
     orbits_arg: &mut Vec<usize>,
     options: &OptionBlk,
     stats_arg: &mut StatBlk,
@@ -600,20 +606,20 @@ fn nauty(
     let fixedpts: Vec<Set>;
     let firstlab: Vec<usize>;
     let canonlab: Vec<usize>;
-    let firstcode: Vec<u8>;
+    let mut firstcode: Vec<usize> = vec![0; n + 2];
     let canoncode: Vec<u8>;
     let firsttc: Vec<usize>;
-    let mut active: Vec<Set>;
+    let mut active: Set;
 
     /* initialize everything: */
+    active = Set::one(0);
     if options.defaultptn {
         for i in 0..n {
             lab[i] = i;
             ptn[i] = NAUTY_INFINITY;
         }
         ptn[n - 1] = 0;
-        active = vec![(Set::new())];
-        active[0].add_one(0);
+        active = Set::one(0);
         numcells = 1;
     } else {
         ptn[n - 1] = 0;
@@ -625,15 +631,15 @@ fn nauty(
                 numcells += 1;
             }
             if active_arg.is_empty() {
-                active = vec![(Set::new())];
+                active = Set::zeros(n);
                 for mut i in 0..n {
-                    active[0].add_one(i);
+                    active.add_one(i);
                     while ptn[i] != 0 {
                         i += 1;
                     }
                 }
             } else {
-                active = active_arg.to_vec();
+                active = active_arg.clone();
             }
         }
     }
@@ -650,7 +656,14 @@ fn nauty(
     nauty_env.invarsuclevel = NAUTY_INFINITY;
     nauty_env.invapplics = 0;
     nauty_env.invsuccesses = 0;
-    firstpathnode0(g_arg, lab, ptn, 1, numcells, LinkedList::new(), &mut stats);
+    let mut partition = Partition::new(PartitionNest::new(lab.to_vec(), ptn.to_vec()), 1);
+    firstpathnode_nest(
+        g_arg,
+        &mut partition,
+        &mut active,
+        &mut firstcode,
+        &mut stats,
+    );
     Ok(())
 }
 
@@ -672,13 +685,12 @@ fn nauty(
 *                    (*userlevelproc)(),(*tcellproc)(),shortprune()          *
 *                                                                            *
 *****************************************************************************/
-fn firstpathnode0(
+fn firstpathnode(
     g_arg: Graph,
     lab: &mut [usize],
     ptn: &mut [usize],
     level: usize,
     numcells: usize,
-    tcnode_parent: LinkedList<Set>,
     stats: &mut StatBlk,
 ) -> Result<(), u8> {
     let tv: usize;
@@ -691,12 +703,7 @@ fn firstpathnode0(
     let qinvar: usize;
     let refcode: usize;
     let mut tcell: &mut Set;
-    let mut tcnode_this: LinkedList<Set> = tcnode_parent;
 
-    if tcnode_this.is_empty() {
-        tcnode_this.push_back(Set::new());
-    }
-    tcell = tcnode_this.front_mut().unwrap();
     stats.numnodes += 1;
 
     /* refine partition : */
@@ -720,4 +727,48 @@ fn firstpathnode0(
     //     n,
     // );
     Ok(())
+}
+
+fn firstpathnode_nest(
+    mut g_arg: Graph,
+    mut partition: &mut Partition,
+    mut active: &mut Set,
+    firstcode: &mut Vec<usize>,
+    stats: &mut StatBlk,
+) -> Result<(), u8> {
+    let tv: usize;
+    let tv1: usize;
+    let index: usize;
+    let rtnlevel: usize;
+    let tcellsize: usize = 0;
+    let tc: isize; // target cell
+    let childcount: usize;
+    let mut qinvar: usize = 0;
+    let mut refcode: usize = 0;
+    let mut tcell: Vec<Set>;
+
+    stats.numnodes += 1;
+
+    /* refine partition : */
+    doref_nest(
+        &mut g_arg,
+        &mut partition,
+        &mut qinvar,
+        &mut active,
+        &mut refcode,
+    );
+    firstcode[partition.level] = refcode;
+    if qinvar > 0 {
+        todo!("qinvar always == 0");
+    }
+    tc = -1;
+    if !partition.is_discrete() {
+        maketargetcell();
+        stats.tctotal += tcellsize;
+    }
+    Ok(())
+}
+
+fn maketargetcell() {
+    todo!()
 }

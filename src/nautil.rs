@@ -1,6 +1,7 @@
-use bitvec::{bitvec, order::Msb0};
-
-use crate::nauty::{Graph, NautyEnv, Set, SetTrait};
+use crate::{
+    naugraph::refine_nest,
+    nauty::{Graph, Set, SetTrait, partition_nest::partition::Partition},
+};
 
 pub trait SetWordNautilTrait {
     fn next_element(&self, pos: Option<usize>) -> Option<usize>;
@@ -88,3 +89,15 @@ impl SetWordNautilTrait for Set {
 
 //     refproc()
 // }
+
+// case where invarproc is null, dorest just calls refine
+pub fn doref_nest(
+    g: &mut Graph,
+    partition: &mut Partition,
+    qinvar: &mut usize,
+    active: &mut Set,
+    code: &mut usize,
+) {
+    refine_nest(g, partition, active, code);
+    *qinvar = 0;
+}

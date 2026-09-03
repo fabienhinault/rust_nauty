@@ -25,12 +25,20 @@ impl Partition {
         Self { nest, level }
     }
 
+    pub fn string(&self) -> String {
+        self.nest.partition_string(self.level)
+    }
+
     pub fn numcells(&self) -> usize {
         self.nest.numcells(self.level)
     }
 
     pub fn numcells_mut(&mut self) -> &mut usize {
         self.nest.numcells_mut(self.level)
+    }
+
+    pub fn is_discrete(&self) -> bool {
+        self.nest.ptn.iter().all(|i| *i <= self.level)
     }
 
     /// last index of cell containing i for partition of given level
@@ -104,5 +112,30 @@ impl Index<usize> for Partition {
 
     fn index(&self, index: usize) -> &Self::Output {
         &self.nest.lab[index]
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::nauty::partition_nest::partition::Partition;
+
+    const LAB: &[usize] = &[4, 6, 2, 0, 8, 7, 5, 9, 3, 1];
+    const PTN: &[usize] = &[4, 3, 4, 1, 2, 4, 4, 0, 2, 0];
+
+    #[test]
+    fn test_is_discrete_4() {
+        let partition4 = Partition::new(PartitionNest::new(LAB.to_vec(), PTN.to_vec()), 4);
+        assert!(partition4.is_discrete());
+        assert_eq!(partition4.numcells(), partition4.len());
+        assert_eq!(partition4.string(), "4 | 6 | 2 | 0 | 8 | 7 | 5 | 9 | 3 | 1");
+    }
+
+    #[test]
+    fn test_is_not_discrete_3() {
+        let partition3 = Partition::new(PartitionNest::new(LAB.to_vec(), PTN.to_vec()), 3);
+        assert!(!partition3.is_discrete());
+        assert_eq!(partition3.numcells(), 6);
+        assert_eq!(partition3.string(), "4, 6 | 2, 0 | 8 | 7, 5, 9 | 3 | 1");
     }
 }
