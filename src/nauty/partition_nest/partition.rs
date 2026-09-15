@@ -154,17 +154,17 @@ impl Partition {
     }
 
     /*****************************************************************************
-    *                                                                            *
-    *  cheapautom(ptn,level,digraph,n) returns TRUE if the partition at the      *
-    *  specified level in the partition nest (lab,ptn) {lab is not needed here}  *
-    *  satisfies a simple sufficient condition for its cells to be the orbits of *
-    *  some subgroup of the automorphism group.  Otherwise it returns FALSE.     *
-    *  It always returns FALSE if digraph!=FALSE.                                *
-    *                                                                            *
-    *  nauty assumes that this function will always return TRUE for any          *
-    *  partition finer than one for which it returns TRUE.                       *
-    *                                                                            *
-    *****************************************************************************/
+     *                                                                            *
+     *  cheapautom(ptn,level,digraph,n) returns TRUE if the partition at the      *
+     *  specified level in the partition nest (lab,ptn) {lab is not needed here}  *
+     *  satisfies a simple sufficient condition for its cells to be the orbits of *
+     *  some subgroup of the automorphism group.  Otherwise it returns FALSE.     *
+     *  It always returns FALSE if digraph!=FALSE.                                *
+     *                                                                            *
+     *  nauty assumes that this function will always return TRUE for any          *
+     *  partition finer than one for which it returns TRUE.                       *
+     *                                                                            *
+     *****************************************************************************/
     // naugraph.c 495
     pub fn cheapautom(&self) -> bool {
         let n = self.len();

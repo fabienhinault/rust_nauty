@@ -368,7 +368,7 @@ pub fn targetcell<'a>(
         {
             partition.get_cell(hint)
         }
-        None if partition.level <= tc_level => partition.bestcell(g),
+        _ if partition.level <= tc_level => partition.bestcell(g),
         _ => partition
             .find_non_singleton()
             .unwrap_or(partition.cells().next().expect("first cell")),
