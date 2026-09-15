@@ -21,27 +21,12 @@ pub struct PartitionNest {
     /// lab must always be a permutation of [[0, n-1]]
     lab: Vec<usize>,
     ptn: Vec<usize>,
-    /// Denormalized numbers of cells at all levels.
-    numcells: Vec<usize>,
 }
 
 impl PartitionNest {
     pub fn new(lab: Vec<usize>, ptn: Vec<usize>) -> Self {
         assert_eq!(lab.len(), ptn.len());
-        let mut nest = Self {
-            lab,
-            ptn,
-            numcells: vec![],
-        };
-        for _ in 0..=nest.max_level() {
-            nest.push_numcells();
-        }
-        nest
-    }
-
-    fn push_numcells(&mut self) {
-        let partition = self.partition_vec(self.numcells.len());
-        self.numcells.push(partition.len());
+        Self { lab, ptn }
     }
 
     pub fn assert_is_sane(&self) {
@@ -63,9 +48,6 @@ impl PartitionNest {
     }
 
     pub fn partition(mut self, level: usize) -> partition::Partition {
-        while level >= self.numcells.len() {
-            self.push_numcells();
-        }
         partition::Partition { nest: self, level }
     }
 
@@ -109,28 +91,6 @@ impl PartitionNest {
 
     pub fn get(&self, i: usize) -> usize {
         self.lab[i]
-    }
-
-    pub fn numcells(&self, level: usize) -> usize {
-        self.numcells[level.min(self.max_level())]
-    }
-
-    pub fn max_level_numcells(&self) -> usize {
-        self.numcells[self.max_level()]
-    }
-
-    fn numcells_mut(&mut self, level: usize) -> &mut usize {
-        self.extend_numcells(level);
-        &mut self.numcells[level]
-    }
-
-    fn extend_numcells(&mut self, level: usize) {
-        if level >= self.numcells.len() {
-            self.numcells.extend_from_slice(&vec![
-                self.max_level_numcells();
-                level - self.numcells.len() + 1
-            ]);
-        }
     }
 }
 

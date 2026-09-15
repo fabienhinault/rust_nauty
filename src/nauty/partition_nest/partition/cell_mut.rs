@@ -99,7 +99,6 @@ pub struct CellMut<'a> {
     pub(crate) first_lab_index: usize,
     pub(crate) cell_lab: &'a mut [usize],
     pub(crate) cell_ptn: &'a mut [usize],
-    pub(crate) numcells: &'a mut usize,
 }
 
 impl<'a> CellMut<'a> {
@@ -122,7 +121,6 @@ impl<'a> CellMut<'a> {
 
     pub fn raw_split(&mut self, i: usize) {
         self.cell_ptn[i] = self.level;
-        *self.numcells += 1;
     }
 
     pub fn partition_index(&self, i: usize) -> usize {
@@ -209,9 +207,6 @@ impl<'a> CellMut<'a> {
                     biggest_cell_pos = Some(current_f_value_index);
                 }
                 f_value_indices.set(f_value, current_f_value_index);
-                if current_f_value_index != 0 {
-                    *self.numcells += 1;
-                }
                 current_f_value_index += count;
                 if current_f_value_index < self.len() {
                     self.cell_ptn[current_f_value_index - 1] = self.level;

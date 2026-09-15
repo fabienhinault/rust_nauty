@@ -38,7 +38,6 @@ impl<'a> PartitionCellsIterMut<'a> {
                 first_lab_index,
                 cell_lab: lab_slice,
                 cell_ptn: ptn_slice,
-                numcells: &mut self.partition.nest.numcells[self.partition.level],
             })
         }
     }

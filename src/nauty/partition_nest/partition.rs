@@ -21,7 +21,6 @@ pub struct Partition {
 
 impl Partition {
     pub fn new(mut nest: PartitionNest, level: usize) -> Self {
-        nest.extend_numcells(level);
         Self { nest, level }
     }
 
@@ -30,11 +29,7 @@ impl Partition {
     }
 
     pub fn numcells(&self) -> usize {
-        self.nest.numcells(self.level)
-    }
-
-    pub fn numcells_mut(&mut self) -> &mut usize {
-        self.nest.numcells_mut(self.level)
+        self.nest.ptn.iter().filter(|i| **i <= self.level).count()
     }
 
     pub fn is_discrete(&self) -> bool {
@@ -97,7 +92,6 @@ impl Partition {
 
     pub fn split(&mut self, i: usize) {
         self.nest.lab[i] = self.level;
-        self.nest.numcells[self.level] += 1;
     }
 
     pub(crate) fn len(&self) -> usize {
@@ -121,7 +115,6 @@ impl Partition {
             first_lab_index: i,
             cell_lab: &mut self.nest.lab[i..=cell_end],
             cell_ptn: &mut self.nest.ptn[i..=cell_end],
-            numcells: &mut self.nest.numcells[self.level],
         }
     }
 
