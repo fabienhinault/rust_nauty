@@ -1,6 +1,7 @@
 use crate::nauty::{Graph, Set, VecMap, partition_nest::partition::cell::Cell};
 use std::{
     iter::once,
+    mem::swap,
     ops::{Index, IndexMut},
 };
 
@@ -109,6 +110,10 @@ impl<'a> CellMut<'a> {
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.cell_lab.is_empty()
+    }
+
+    pub fn to_vec(&self) -> Vec<usize> {
+        self.cell_lab.to_vec()
     }
 
     pub fn swap(&mut self, a: usize, b: usize) {
@@ -249,6 +254,31 @@ impl<'a> CellMut<'a> {
         }
         self.split_from_f_results(f_results)
     }
+
+    /*****************************************************************************
+     *                                                                            *
+     *  breakout(lab,ptn,level,tc,tv,active,m) operates on the partition at       *
+     *  the specified level in the partition nest (lab,ptn).  It finds the        *
+     *  element tv, which is in the cell C starting at index tc in lab (it had    *
+     *  better be) and splits C in the two cells {tv} and C\{tv}, in that order.  *
+     *  It also sets the set active to contain just the element tc.               *
+     *                                                                            *
+     *  GLOBALS ACCESSED: bit<r>                                                  *
+     *                                                                            *
+     *****************************************************************************/
+    // nautil.c 613
+    /// Operate at level + 1, isolate vertex tv in one cell, and other ones
+    /// in another.
+    pub fn breakout(&mut self, tv: usize) {
+        let mut tmp = tv;
+        swap(&mut tmp, &mut self[0]);
+        let mut i = 1;
+        while tmp != tv {
+            swap(&mut tmp, &mut self[i]);
+            i += 1;
+        }
+        self.cell_ptn[0] = self.level + 1;
+    }
 }
 
 pub enum SplitResult {
@@ -355,6 +385,16 @@ mod test {
                 vec![0, 3, 4, 2, 5, 1, 6],
                 vec![2, NAUTY_INFINITY, 2, NAUTY_INFINITY, 2, NAUTY_INFINITY, 0],
             )
+        );
+    }
+
+    fn test_breakout() {
+        let nest = PartitionNest::new(vec![2, 1, 0], vec![NAUTY_INFINITY, NAUTY_INFINITY, 0]);
+        let mut partition = nest.partition(1);
+        partition.get_cell_mut(0).breakout(0);
+        assert_eq!(
+            partition.nest.clone(),
+            PartitionNest::new(vec![0, 2, 1], vec![2, NAUTY_INFINITY, 0],)
         );
     }
 }

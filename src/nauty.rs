@@ -46,8 +46,11 @@ use crate::{
         g6error::G6Error,
         g6string::{G6String, graph_size},
     },
-    nautil::{doref_nest, maketargetcell},
-    nauty::partition_nest::{PartitionNest, partition::Partition},
+    nautil::{doref_nest, maketargetcell, maketargetcell_mut},
+    nauty::partition_nest::{
+        PartitionNest,
+        partition::{Partition, cell::Cell},
+    },
 };
 use bitvec::{bitvec, order::Msb0, vec::BitVec, view::BitView};
 use std::{
@@ -201,6 +204,16 @@ impl SetTrait for Set {
 
     fn masked(&self, pos: usize) -> Self {
         self.filter(&self.bit_mask(pos))
+    }
+}
+
+impl<'a, 'b> From<&'a Cell<'b>> for Set {
+    fn from(value: &'a Cell) -> Self {
+        let mut set = Self::zeros(value.partition.len());
+        for i in value.iter() {
+            set.set(*i, true);
+        }
+        set
     }
 }
 
@@ -552,9 +565,11 @@ pub struct NautyEnv {
     pub comp_canon: usize, /* -1,0,1 according as code at eqlev_canon+1 is <,==,> that for bsf leaf.  Also used for similar purpose during leaf processing */
     pub samerows: usize, /* number of rows of canong which are correct for the bsf leaf  BDM:correct description? */
     pub canonlevel: usize, /* level of bsf leaf */
+    pub cosetindex: usize, /* the point being fixed at level gca_first */
     pub needshortprune: bool, /* used to flag calls to shortprune */
 
     pub workperm: Vec<usize>,
+    pub fixedpts: Set,
     pub first_partition: Partition,
     pub canon_partition: Partition,
     pub firstcode: Vec<u16>,
@@ -633,10 +648,6 @@ fn nauty(
     let mut initstatus: u8;
 
     let defltwork: Vec<Set>;
-    let workperm: Vec<usize>;
-    let fixedpts: Vec<Set>;
-    let firstlab: Vec<usize>;
-    let canonlab: Vec<usize>;
     let mut firstcode: Vec<usize> = vec![0; n + 2];
     let canoncode: Vec<u8>;
     let mut firsttc: VecMap = VecMap::new();
@@ -678,9 +689,9 @@ fn nauty(
     let mut cannong: Graph;
     initstatus = 0;
 
-    let mut orbits: Vec<usize> = (0..n).collect();
+    *orbits_arg = (0..n).collect();
     let mut stats: StatBlk = StatBlk::new(n);
-    fixedpts = vec![];
+    nauty_env.fixedpts = Set::zeros(n);
     nauty_env.noncheaplevel = 1;
     nauty_env.eqlev_canon = -1;
     nauty_env.needshortprune = false;
@@ -696,6 +707,7 @@ fn nauty(
         &mut stats,
         options.tc_level,
         &mut firsttc,
+        orbits_arg,
         &mut nauty_env,
         &options,
     );
@@ -792,6 +804,7 @@ fn firstpathnode_nest(
     stats: &mut StatBlk,
     tc_level: usize,
     firsttc: &mut VecMap,
+    orbits_arg: &mut Vec<usize>,
     nauty_env: &mut NautyEnv,
     options: &OptionBlk,
 ) -> usize {
@@ -803,14 +816,14 @@ fn firstpathnode_nest(
     let childcount: usize;
     let mut qinvar: usize = 0;
     let mut refcode: usize = 0;
-    let mut tcell: Vec<Set>;
+    let level = partition.level;
 
     stats.numnodes += 1;
 
     /* refine partition : */
     doref_nest(
         &mut g_arg,
-        &mut partition,
+        partition,
         &mut qinvar,
         &mut active,
         &mut refcode,
@@ -819,22 +832,38 @@ fn firstpathnode_nest(
     if qinvar > 0 {
         todo!("qinvar always == 0");
     }
-    if !partition.is_discrete() {
-        let cell = maketargetcell(&g_arg, partition, tc_level, None);
-        stats.tctotal += cell.len();
-        firsttc.set(partition.level, cell.first_lab_index);
-    }
-
     if partition.is_discrete() {
         firstterminal(partition, stats, nauty_env, options.getcanon);
-        return Ok(partition.level - 1);
+        return partition.level - 1;
     }
-    if nauty_env.noncheaplevel >= partition.level && !partition.cheapautom() {
+
+    let mut tcell = maketargetcell_mut(&g_arg, partition, tc_level, None);
+    stats.tctotal += tcell.len();
+    firsttc.set(level, tcell.first_lab_index);
+    if nauty_env.noncheaplevel >= level && !partition.cheapautom() {
         nauty_env.noncheaplevel += 1;
     }
-    let mut index = 0;
 
-    Ok(())
+    /* use the elements of the target cell to produce the children: */
+    let mut index = 0;
+    let childcount = 0;
+    let tv1 = tcell.first_lab_index;
+    let cell_lab = tcell.to_vec();
+    for (i, tv) in cell_lab.iter().copied().enumerate() {
+        if orbits_arg[tv] == tv {
+            tcell.breakout(tv);
+            nauty_env.fixedpts.add_one(tv);
+            nauty_env.cosetindex = tv;
+            if tv == tv1 {
+                let rtnlevel = firstpathnode_nest(
+                    g_arg, partition, active, firstcode, stats, tc_level, firsttc, orbits_arg,
+                    nauty_env, options,
+                );
+            }
+        }
+    }
+
+    0
 }
 
 /*****************************************************************************

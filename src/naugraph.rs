@@ -2,7 +2,11 @@ use crate::{
     nautil::SetWordNautilTrait,
     nauty::{
         Graph, Set, SetTrait,
-        partition_nest::partition::{Partition, cell::Cell, cell_mut::SplitResult},
+        partition_nest::partition::{
+            Partition,
+            cell::Cell,
+            cell_mut::{CellMut, SplitResult},
+        },
     },
 };
 use bitvec::{bitvec, order::Msb0};
@@ -356,6 +360,16 @@ fn refine(
 //     let bucket = vec![0; workperm.len()];
 // }
 
+/*****************************************************************************
+*                                                                            *
+*  targetcell(g,lab,ptn,level,tc_level,digraph,hint,m,n) returns the index   *
+*  in lab of the next cell to split.                                         *
+*  hint is a suggestion for the answer, which is obeyed if it is valid.      *
+*  Otherwise we use bestcell() up to tc_level and the first non-trivial      *
+*  cell after that.                                                          *
+*                                                                            *
+*****************************************************************************/
+// 621
 pub fn targetcell<'a>(
     g: &Graph,
     partition: &'a Partition,
@@ -372,6 +386,29 @@ pub fn targetcell<'a>(
         _ => partition
             .find_non_singleton()
             .unwrap_or(partition.cells().next().expect("first cell")),
+    }
+}
+
+pub fn targetcell_mut<'a>(
+    g: &Graph,
+    partition: &'a mut Partition,
+    hint: Option<usize>,
+    tc_level: usize,
+) -> CellMut<'a> {
+    match hint {
+        Some(hint)
+            if !partition.is_cell_end(hint) && (hint == 0 || partition.is_cell_end(hint - 1)) =>
+        {
+            partition.get_cell_mut(hint)
+        }
+        _ if partition.level <= tc_level => partition.bestcell_mut(g),
+        _ => {
+            let i = partition
+                .find_non_singleton()
+                .unwrap_or(partition.cells().next().expect("first cell"))
+                .first_lab_index;
+            partition.get_cell_mut(i)
+        }
     }
 }
 #[cfg(test)]

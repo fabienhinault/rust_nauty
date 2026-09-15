@@ -1,8 +1,8 @@
 use crate::{
-    naugraph::{refine_nest, targetcell},
+    naugraph::{refine_nest, targetcell, targetcell_mut},
     nauty::{
         Graph, Set, SetTrait,
-        partition_nest::partition::{Partition, cell::Cell},
+        partition_nest::partition::{Partition, cell::Cell, cell_mut::CellMut},
     },
 };
 
@@ -105,6 +105,23 @@ pub fn doref_nest(
     *qinvar = 0;
 }
 
+/*****************************************************************************
+*                                                                            *
+*  maketargetcell(g,lab,ptn,level,tcell,tcellsize,&cellpos,                  *
+*                 tc_level,digraph,hint,targetcell,m,n)                      *
+*  calls targetcell() to determine the target cell at the specified level    *
+*  in the partition nest (lab,ptn).  It must be a nontrivial cell (if not,   *
+*  the first cell.  The intention of hint is that, if hint >= 0 and there    *
+*  is a suitable non-trivial cell starting at position hint in lab,          *
+*  that cell is chosen.                                                      *
+*  tc_level and digraph are input options.                                   *
+*  When a cell is chosen, tcell is set to its contents, *tcellsize to its    *
+*  size, and cellpos to its starting position in lab.                        *
+*                                                                            *
+*  GLOBALS ACCESSED: bit<r>                                                  *
+*                                                                            *
+*****************************************************************************/
+// l565
 pub fn maketargetcell<'a>(
     g: &Graph,
     partition: &'a Partition,
@@ -112,4 +129,13 @@ pub fn maketargetcell<'a>(
     hint: Option<usize>,
 ) -> Cell<'a> {
     targetcell(g, partition, hint, tc_level)
+}
+
+pub fn maketargetcell_mut<'a>(
+    g: &Graph,
+    partition: &'a mut Partition,
+    tc_level: usize,
+    hint: Option<usize>,
+) -> CellMut<'a> {
+    targetcell_mut(g, partition, hint, tc_level)
 }

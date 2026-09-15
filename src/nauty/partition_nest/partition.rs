@@ -81,18 +81,18 @@ impl Partition {
         }
     }
 
-    pub fn non_singleton_starts(&self) -> Vec<usize> {
-        self.cells()
-            .filter(|c| c.len() > 1)
-            .map(|c| c.first_lab_index)
-            .collect()
-    }
-
     pub fn cells_mut(&mut self) -> partition_cells_iter_mut::PartitionCellsIterMut<'_> {
         partition_cells_iter_mut::PartitionCellsIterMut {
             partition: self,
             index: 0,
         }
+    }
+
+    pub fn non_singleton_starts(&self) -> Vec<usize> {
+        self.cells()
+            .filter(|c| c.len() > 1)
+            .map(|c| c.first_lab_index)
+            .collect()
     }
 
     pub fn split(&mut self, i: usize) {
@@ -125,6 +125,18 @@ impl Partition {
         }
     }
 
+    /*****************************************************************************
+     *                                                                            *
+     *  bestcell(g,lab,ptn,level,tc_level,m,n) returns the index in lab of the    *
+     *  start of the "best non-singleton cell" for fixing.  If there is no        *
+     *  non-singleton cell it returns n.                                          *
+     *  This implementation finds the first cell which is non-trivially joined    *
+     *  to the greatest number of other cells.                                    *
+     *                                                                            *
+     *  GLOBALS ACCESSED: bit<r>,workperm<rw>,workset<rw>,bucket<rw>              *
+     *                                                                            *
+     *****************************************************************************/
+    // naugraph.c l530
     pub fn bestcell<'a>(&'a self, g: &Graph) -> Cell<'a> {
         let non_singleton_cells: Vec<Cell> = self.cells().filter(|c| c.len() > 1).collect();
         let mut neighbours_counts: Vec<usize> = vec![0; non_singleton_cells.len()];
@@ -151,6 +163,11 @@ impl Partition {
             .max_by(|(_, cnt0), (_, cnt1)| cnt0.cmp(cnt1))
             .map(|(cell, _)| cell)
             .expect("bestcell")
+    }
+
+    pub fn bestcell_mut(&mut self, g: &Graph) -> CellMut {
+        let i = self.bestcell(g).first_lab_index;
+        self.get_cell_mut(i)
     }
 
     /*****************************************************************************
