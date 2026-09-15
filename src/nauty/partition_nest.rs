@@ -159,7 +159,7 @@ impl Display for PartitionNest {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::nauty::{NAUTY_INFINITY, partition_nest::partition::Partition};
+    use crate::nauty::{NAUTY_INFINITY, Set, partition_nest::partition::Partition};
     use bitvec::{bitvec, order::Msb0};
     use test_case::test_case;
 
