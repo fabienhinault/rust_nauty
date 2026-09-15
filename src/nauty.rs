@@ -133,7 +133,7 @@ pub const NAUTY_INFINITY_I: isize = 2_000_000_002; /* Max graph size is 2 billio
 // the BitVec of index i has the vertices adjascent to vertex of index i.
 // g.0[i][j] == 1 iff (i, j) is an edge of g.
 pub type Set = BitVec<usize, Msb0>;
-#[derive(Default, PartialEq, Debug)]
+#[derive(Default, PartialEq, Debug, Clone)]
 pub struct Graph(pub Vec<BitVec<usize, Msb0>>);
 pub type NautyCounter = u128;
 
@@ -422,7 +422,8 @@ impl Graph {
     }
 
     pub fn canonise(&self) -> Self {
-        todo!()
+        todo!();
+        self.clone()
     }
 
     pub fn isconnected(&self) -> bool {
@@ -700,7 +701,7 @@ fn nauty(
     nauty_env.invsuccesses = 0;
     let mut partition = Partition::new(PartitionNest::new(lab.to_vec(), ptn.to_vec()), 1);
     firstpathnode_nest(
-        g_arg,
+        &g_arg,
         &mut partition,
         &mut active,
         &mut firstcode,
@@ -797,7 +798,7 @@ fn firstpathnode(
 *****************************************************************************/
 // 561
 fn firstpathnode_nest(
-    mut g_arg: Graph,
+    mut g_arg: &Graph,
     mut partition: &mut Partition,
     mut active: &mut Set,
     firstcode: &mut Vec<usize>,
@@ -817,17 +818,12 @@ fn firstpathnode_nest(
     let mut qinvar: usize = 0;
     let mut refcode: usize = 0;
     let level = partition.level;
+    let cheapautom = partition.cheapautom();
 
     stats.numnodes += 1;
 
     /* refine partition : */
-    doref_nest(
-        &mut g_arg,
-        partition,
-        &mut qinvar,
-        &mut active,
-        &mut refcode,
-    );
+    doref_nest(g_arg, partition, &mut qinvar, &mut active, &mut refcode);
     firstcode[partition.level] = refcode;
     if qinvar > 0 {
         todo!("qinvar always == 0");
@@ -840,7 +836,7 @@ fn firstpathnode_nest(
     let mut tcell = maketargetcell_mut(&g_arg, partition, tc_level, None);
     stats.tctotal += tcell.len();
     firsttc.set(level, tcell.first_lab_index);
-    if nauty_env.noncheaplevel >= level && !partition.cheapautom() {
+    if nauty_env.noncheaplevel >= level && !cheapautom {
         nauty_env.noncheaplevel += 1;
     }
 
@@ -855,10 +851,10 @@ fn firstpathnode_nest(
             nauty_env.fixedpts.add_one(tv);
             nauty_env.cosetindex = tv;
             if tv == tv1 {
-                let rtnlevel = firstpathnode_nest(
-                    g_arg, partition, active, firstcode, stats, tc_level, firsttc, orbits_arg,
-                    nauty_env, options,
-                );
+                // let rtnlevel = firstpathnode_nest(
+                //     g_arg, partition, active, firstcode, stats, tc_level, firsttc, orbits_arg,
+                //     nauty_env, options,
+                // );
             }
         }
     }

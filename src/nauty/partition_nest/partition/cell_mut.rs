@@ -388,13 +388,14 @@ mod test {
         );
     }
 
+    #[test]
     fn test_breakout() {
         let nest = PartitionNest::new(vec![2, 1, 0], vec![NAUTY_INFINITY, NAUTY_INFINITY, 0]);
         let mut partition = nest.partition(1);
         partition.get_cell_mut(0).breakout(0);
         assert_eq!(
-            partition.nest.clone(),
-            PartitionNest::new(vec![0, 2, 1], vec![2, NAUTY_INFINITY, 0],)
+            partition.nest,
+            PartitionNest::new(vec![0, 2, 1], vec![2, NAUTY_INFINITY, 0])
         );
     }
 }

@@ -95,7 +95,7 @@ impl SetWordNautilTrait for Set {
 
 // case where invarproc is null, dorest just calls refine
 pub fn doref_nest(
-    g: &mut Graph,
+    g: &Graph,
     partition: &mut Partition,
     qinvar: &mut usize,
     active: &mut Set,

@@ -1,7 +1,10 @@
-use crate::nauty::{NAUTY_INFINITY, Set};
+use crate::nauty::NAUTY_INFINITY;
 use partition_nest_chunk_by::PartitionNestChunkBy;
 use partition_nest_chunk_by_mut::PartitionNestChunkByMut;
-use std::{fmt::Debug, ops::Index};
+use std::{
+    fmt::{Debug, Display},
+    ops::Index,
+};
 
 pub mod partition;
 mod partition_nest_chunk_by;
@@ -13,7 +16,7 @@ mod partition_nest_chunk_by_mut;
 /// *    subinterval of [0,n-1] such that ptn[k] > x for i <= k < j and          *
 /// *    ptn[j] <= x.  The partition at level 0 is given to nauty by the user.   *
 /// *    This is  refined for the root of the tree, which has level 1.           *
-#[derive(Default, PartialEq, Clone)]
+#[derive(Default, PartialEq, Clone, Debug)]
 pub struct PartitionNest {
     /// lab must always be a permutation of [[0, n-1]]
     lab: Vec<usize>,
@@ -30,11 +33,15 @@ impl PartitionNest {
             ptn,
             numcells: vec![],
         };
-        for level in 0..=nest.max_level() {
-            let partition = nest.partition_vec(level);
-            nest.numcells.push(partition.len());
+        for _ in 0..=nest.max_level() {
+            nest.push_numcells();
         }
         nest
+    }
+
+    fn push_numcells(&mut self) {
+        let partition = self.partition_vec(self.numcells.len());
+        self.numcells.push(partition.len());
     }
 
     pub fn assert_is_sane(&self) {
@@ -55,7 +62,10 @@ impl PartitionNest {
         PartitionNestChunkByMut::new(&mut self.lab, &mut self.ptn, level)
     }
 
-    pub fn partition(self, level: usize) -> partition::Partition {
+    pub fn partition(mut self, level: usize) -> partition::Partition {
+        while level >= self.numcells.len() {
+            self.push_numcells();
+        }
         partition::Partition { nest: self, level }
     }
 
@@ -132,7 +142,7 @@ impl Index<usize> for PartitionNest {
     }
 }
 
-impl Debug for PartitionNest {
+impl Display for PartitionNest {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("PartitionNest")
             .field("lab", &self.lab)
@@ -221,9 +231,9 @@ mod test {
     }
 
     #[test]
-    fn test_debug() {
+    fn test_display() {
         assert_eq!(
-            format!("{:?}", PartitionNest::new(Vec::from(LAB), Vec::from(PTN))),
+            format!("{}", PartitionNest::new(Vec::from(LAB), Vec::from(PTN))),
             "".to_owned()
                 + "PartitionNest { lab: [4, 6, 2, 0, 8, 7, 5, 9, 3, 1], ptn: [2000000002, 3, 2000000002, 1, 2, 2000000002, 2000000002, 0, 2, 0] }\n"
                 + "0:  4, 6, 2, 0, 8, 7, 5, 9 | 3, 1\n"
@@ -237,7 +247,7 @@ mod test {
     fn test_unpartioned_4() {
         assert_eq!(
             format!(
-                "{:?}",
+                "{}",
                 PartitionNest::new(
                     vec![0, 1, 2, 3],
                     vec![NAUTY_INFINITY, NAUTY_INFINITY, NAUTY_INFINITY, 0]
