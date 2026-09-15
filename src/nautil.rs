@@ -1,6 +1,9 @@
 use crate::{
-    naugraph::refine_nest,
-    nauty::{Graph, Set, SetTrait, partition_nest::partition::Partition},
+    naugraph::{refine_nest, targetcell},
+    nauty::{
+        Graph, Set, SetTrait,
+        partition_nest::partition::{Partition, cell::Cell},
+    },
 };
 
 pub trait SetWordNautilTrait {
@@ -102,14 +105,11 @@ pub fn doref_nest(
     *qinvar = 0;
 }
 
-pub fn maketargetcell(
+pub fn maketargetcell<'a>(
     g: &Graph,
-    partition: &Partition,
-    tcell: &mut Set,
+    partition: &'a Partition,
     tc_level: usize,
-    hint: usize,
-) {
-    let i: usize;
-    let j: usize;
-    let k: usize;
+    hint: Option<usize>,
+) -> Cell<'a> {
+    targetcell(g, partition, hint, tc_level)
 }

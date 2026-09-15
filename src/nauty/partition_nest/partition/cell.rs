@@ -35,9 +35,12 @@ impl<'a> Cell<'a> {
         self.cell_lab.iter()
     }
 
-    pub fn set(&self, g: &Graph) -> Set {
-        self.iter()
-            .fold(Set::zeros(g.n()), |acc, i| acc & g.0[*i].clone())
+    pub fn set(&self, n: usize) -> Set {
+        let mut cell_set = Set::zeros(n);
+        for i in self.iter() {
+            cell_set.add_one(*i);
+        }
+        cell_set
     }
 }
 

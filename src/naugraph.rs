@@ -2,12 +2,12 @@ use crate::{
     nautil::SetWordNautilTrait,
     nauty::{
         Graph, Set, SetTrait,
-        partition_nest::partition::{Partition, cell_mut::SplitResult},
+        partition_nest::partition::{Partition, cell::Cell, cell_mut::SplitResult},
     },
 };
 use bitvec::{bitvec, order::Msb0};
 use cfor::cfor;
-use itertools::Itertools;
+use itertools::{Itertools, partition};
 
 struct NaugraphEnv {
     pub workset: Vec<Set>,
@@ -356,15 +356,22 @@ fn refine(
 //     let bucket = vec![0; workperm.len()];
 // }
 
-pub fn targetcell(g: &Graph, partition: &Partition, hint: Option<usize>) -> usize {
-    let i: usize;
+pub fn targetcell<'a>(
+    g: &Graph,
+    partition: &'a Partition,
+    hint: Option<usize>,
+    tc_level: usize,
+) -> Cell<'a> {
     match hint {
         Some(hint)
             if !partition.is_cell_end(hint) && (hint == 0 || partition.is_cell_end(hint - 1)) =>
         {
-            hint
+            partition.get_cell(hint)
         }
-        _ => 0,
+        None if partition.level <= tc_level => partition.bestcell(g),
+        _ => partition
+            .find_non_singleton()
+            .unwrap_or(partition.cells().next().expect("first cell")),
     }
 }
 #[cfg(test)]

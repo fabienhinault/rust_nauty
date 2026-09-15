@@ -46,13 +46,14 @@ use crate::{
         g6error::G6Error,
         g6string::{G6String, graph_size},
     },
-    nautil::doref_nest,
+    nautil::{doref_nest, maketargetcell},
     nauty::partition_nest::{PartitionNest, partition::Partition},
 };
 use bitvec::{bitvec, order::Msb0, vec::BitVec, view::BitView};
-use std::fmt::Debug;
 use std::{
+    fmt::Debug,
     fs::File,
+    mem,
     ops::{Index, IndexMut},
 };
 
@@ -69,7 +70,7 @@ struct OptionBlk {
     cartesian: bool,    /* use cartesian rep for writing automs? */
     linelength: u8,     /* max chars/line (excl. '\n') for output */
     outfile: File,      /* file for output, if any */
-    tc_level: u8,       /* max level for smart target cell choosing */
+    tc_level: usize,    /* max level for smart target cell choosing */
     mininvarlevel: u8,  /* min level for invariant computation */
     maxinvarlevel: u8,  /* max level for invariant computation */
     invararg: u8,       /* value passed to (*invarproc)() */
@@ -541,16 +542,37 @@ pub struct NautyEnv {
     pub invapplics: usize,
     pub invsuccesses: usize,
     pub invarsuclevel: usize,
+    /* working variables: <the "bsf leaf" is the leaf which is best guess so far at the canonical leaf>  */
+    pub gca_first: usize, /* level of greatest common ancestor of current node and first leaf */
+    pub gca_canon: usize, /* ditto for current node and bsf leaf */
     pub noncheaplevel: usize, /* level of greatest ancestor for which cheapautom==FALSE */
-    pub eqlev_canon: isize,   /* level to which codes for this node match those for the bsf leaf. */
-
+    pub allsamelevel: usize, /* level of least ancestor of first leaf for which all descendant leaves are known to be equivalent */
+    pub eqlev_first: usize,  /* level to which codes for this node match those for first leaf */
+    pub eqlev_canon: isize,  /* level to which codes for this node match those for the bsf leaf. */
+    pub comp_canon: usize, /* -1,0,1 according as code at eqlev_canon+1 is <,==,> that for bsf leaf.  Also used for similar purpose during leaf processing */
+    pub samerows: usize, /* number of rows of canong which are correct for the bsf leaf  BDM:correct description? */
+    pub canonlevel: usize, /* level of bsf leaf */
     pub needshortprune: bool, /* used to flag calls to shortprune */
 
     pub workperm: Vec<usize>,
+    pub first_partition: Partition,
+    pub canon_partition: Partition,
+    pub firstcode: Vec<u16>,
+    pub canoncode: Vec<u16>,
+    pub firsttc: Vec<isize>,
     pub active: Vec<Set>,
     pub workspace: Vec<Set>, /*work area to hold automorphism data */
 }
 
+impl NautyEnv {
+    fn new(n: usize) -> Self {
+        Self {
+            firstcode: vec![0; n + 2],
+            firsttc: vec![0; n + 2],
+            ..Default::default()
+        }
+    }
+}
 /*****************************************************************************
 *                                                                            *
 *  This procedure finds generators for the automorphism group of a           *
@@ -604,8 +626,8 @@ fn nauty(
     stats_arg: &mut StatBlk,
     canong_arg: &mut Graph,
 ) -> Result<(), u8> {
-    let mut nauty_env = NautyEnv::default();
     let n = g_arg.n();
+    let mut nauty_env = NautyEnv::new(n);
 
     let mut numcells: usize;
     let mut initstatus: u8;
@@ -617,7 +639,7 @@ fn nauty(
     let canonlab: Vec<usize>;
     let mut firstcode: Vec<usize> = vec![0; n + 2];
     let canoncode: Vec<u8>;
-    let firsttc: Vec<usize>;
+    let mut firsttc: VecMap = VecMap::new();
     let mut active: Set;
 
     /* initialize everything: */
@@ -672,6 +694,10 @@ fn nauty(
         &mut active,
         &mut firstcode,
         &mut stats,
+        options.tc_level,
+        &mut firsttc,
+        &mut nauty_env,
+        &options,
     );
     Ok(())
 }
@@ -701,6 +727,7 @@ fn firstpathnode(
     level: usize,
     numcells: usize,
     stats: &mut StatBlk,
+    firsttc: &mut VecMap,
 ) -> Result<(), u8> {
     let tv: usize;
     let tv1: usize;
@@ -738,18 +765,40 @@ fn firstpathnode(
     Ok(())
 }
 
+/*****************************************************************************
+*                                                                            *
+*  firstpathnode(lab,ptn,level,numcells) produces a node on the leftmost     *
+*  path down the tree.  The parameters describe the level and the current    *
+*  colour partition.  The set of active cells is taken from the global set   *
+*  'active'.  If the refined partition is not discrete, the leftmost child   *
+*  is produced by calling firstpathnode, and the other children by calling   *
+*  othernode.                                                                *
+*  For MAXN=0 there is an extra parameter: the address of the parent tcell   *
+*  structure.                                                                *
+*  The value returned is the level to return to.                             *
+*                                                                            *
+*  FUNCTIONS CALLED: (*usernodeproc)(),doref(),cheapautom(),                 *
+*                    firstterminal(),nextelement(),breakout(),               *
+*                    firstpathnode(),othernode(),recover(),writestats(),     *
+*                    (*userlevelproc)(),(*tcellproc)(),shortprune()          *
+*                                                                            *
+*****************************************************************************/
+// 561
 fn firstpathnode_nest(
     mut g_arg: Graph,
     mut partition: &mut Partition,
     mut active: &mut Set,
     firstcode: &mut Vec<usize>,
     stats: &mut StatBlk,
-) -> Result<(), u8> {
+    tc_level: usize,
+    firsttc: &mut VecMap,
+    nauty_env: &mut NautyEnv,
+    options: &OptionBlk,
+) -> usize {
     let tv: usize;
     let tv1: usize;
     let index: usize;
     let rtnlevel: usize;
-    let tcellsize: usize = 0;
     let tc: isize; // target cell
     let childcount: usize;
     let mut qinvar: usize = 0;
@@ -770,14 +819,58 @@ fn firstpathnode_nest(
     if qinvar > 0 {
         todo!("qinvar always == 0");
     }
-    tc = -1;
     if !partition.is_discrete() {
-        maketargetcell();
-        stats.tctotal += tcellsize;
+        let cell = maketargetcell(&g_arg, partition, tc_level, None);
+        stats.tctotal += cell.len();
+        firsttc.set(partition.level, cell.first_lab_index);
     }
+
+    if partition.is_discrete() {
+        firstterminal(partition, stats, nauty_env, options.getcanon);
+        return Ok(partition.level - 1);
+    }
+    if nauty_env.noncheaplevel >= partition.level && !partition.cheapautom() {
+        nauty_env.noncheaplevel += 1;
+    }
+    let mut index = 0;
+
     Ok(())
 }
 
-fn maketargetcell() {
-    todo!()
+/*****************************************************************************
+*                                                                            *
+*  Process the first leaf of the tree.                                       *
+*                                                                            *
+*  FUNCTIONS CALLED: NONE                                                    *
+*                                                                            *
+*****************************************************************************/
+//866
+
+fn firstterminal(
+    partition: &Partition,
+    stats: &mut StatBlk,
+    nauty_env: &mut NautyEnv,
+    getcanon: u8,
+) {
+    let level = partition.level;
+    stats.maxlevel = level;
+    nauty_env.gca_first = level;
+    nauty_env.allsamelevel = level;
+    nauty_env.eqlev_first = level;
+    nauty_env.firstcode[level + 1] = 0o77777;
+    nauty_env.firsttc[level + 1] = -1;
+
+    nauty_env.first_partition = partition.clone();
+
+    if getcanon != 0 {
+        nauty_env.canonlevel = level;
+        nauty_env.eqlev_canon = level as isize;
+        nauty_env.gca_canon = level;
+        nauty_env.comp_canon = 0;
+        nauty_env.samerows = 0;
+        nauty_env.canon_partition = partition.clone();
+        nauty_env.canoncode[0..=level].copy_from_slice(&nauty_env.firstcode[0..=level]);
+        nauty_env.canoncode[level + 1] = 0o77777;
+        stats.canupdates = 1;
+    }
 }

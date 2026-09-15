@@ -7,13 +7,13 @@ use bitvec::bitvec;
 use bitvec::order::Msb0;
 use std::ops::Index;
 
-mod cell;
+pub mod cell;
 pub mod cell_mut;
 mod partition_cells_iter;
 mod partition_cells_iter_mut;
 mod partition_subset;
 
-#[derive(Default, PartialEq, Debug)]
+#[derive(Default, PartialEq, Debug, Clone)]
 pub struct Partition {
     pub(crate) nest: PartitionNest,
     pub(crate) level: usize,
@@ -43,6 +43,14 @@ impl Partition {
 
     pub fn is_cell_end(&self, i: usize) -> bool {
         self.nest.ptn[i] <= self.level
+    }
+
+    pub fn find_non_singleton_index(&self) -> Option<usize> {
+        self.nest.ptn.iter().find(|i| **i > self.level).copied()
+    }
+
+    pub fn find_non_singleton(&self) -> Option<Cell> {
+        self.cells().find(|c| c.len() > 1)
     }
 
     /// last index of cell containing i for partition of given level
@@ -117,14 +125,17 @@ impl Partition {
         }
     }
 
-    pub fn bestcell(&self, g: &Graph) -> Cell {
+    pub fn bestcell<'a>(&'a self, g: &Graph) -> Cell<'a> {
         let non_singleton_cells: Vec<Cell> = self.cells().filter(|c| c.len() > 1).collect();
         let mut neighbours_counts: Vec<usize> = vec![0; non_singleton_cells.len()];
-        for v2 in 0..non_singleton_cells.len() {
-            let workset = non_singleton_cells[v2].set(g);
+        for v2 in 1..non_singleton_cells.len() {
+            let workset = non_singleton_cells[v2].set(g.n());
+            println!("{workset:?}");
             for v1 in 0..v2 {
                 // Q why do we test only the first vertex of non_singleton_cells[v1]?
-                let gp = &g.0[non_singleton_cells[v1][0]];
+                let first_cell_index = non_singleton_cells[v1][0];
+                let gp = &g.0[first_cell_index];
+                println!("{gp:?}");
                 let set1 = workset.clone() & gp.clone();
                 let set2 = workset.clone() & !gp.clone();
                 if set1.any() && set2.any() {
@@ -140,6 +151,36 @@ impl Partition {
             .max_by(|(_, cnt0), (_, cnt1)| cnt0.cmp(cnt1))
             .map(|(cell, _)| cell)
             .expect("bestcell")
+    }
+
+    /*****************************************************************************
+    *                                                                            *
+    *  cheapautom(ptn,level,digraph,n) returns TRUE if the partition at the      *
+    *  specified level in the partition nest (lab,ptn) {lab is not needed here}  *
+    *  satisfies a simple sufficient condition for its cells to be the orbits of *
+    *  some subgroup of the automorphism group.  Otherwise it returns FALSE.     *
+    *  It always returns FALSE if digraph!=FALSE.                                *
+    *                                                                            *
+    *  nauty assumes that this function will always return TRUE for any          *
+    *  partition finer than one for which it returns TRUE.                       *
+    *                                                                            *
+    *****************************************************************************/
+    // naugraph.c 495
+    pub fn cheapautom(&self) -> bool {
+        let n = self.len();
+        let mut k = n;
+        let mut nnt = 0;
+        for mut i in 0..n {
+            k -= 1;
+            if self.nest.ptn[i] > self.level {
+                nnt += 1;
+                i += 1;
+                while self.nest.ptn[i] > self.level {
+                    i += 1;
+                }
+            }
+        }
+        k <= nnt + 1 || k <= 4
     }
 }
 
@@ -186,6 +227,7 @@ mod test {
             [NAUTY_INFINITY, 0, NAUTY_INFINITY, 0, NAUTY_INFINITY, 0].to_vec(),
         );
         let partition = Partition::new(nest, 1);
-        assert_eq!(partition.bestcell(&g).first_lab_index, 2);
+        let best_cell = partition.bestcell(&g);
+        assert_eq!(best_cell.first_lab_index, 2);
     }
 }
