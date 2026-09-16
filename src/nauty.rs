@@ -563,9 +563,10 @@ pub struct NautyEnv {
     pub allsamelevel: usize, /* level of least ancestor of first leaf for which all descendant leaves are known to be equivalent */
     pub eqlev_first: usize,  /* level to which codes for this node match those for first leaf */
     pub eqlev_canon: isize,  /* level to which codes for this node match those for the bsf leaf. */
-    pub comp_canon: usize, /* -1,0,1 according as code at eqlev_canon+1 is <,==,> that for bsf leaf.  Also used for similar purpose during leaf processing */
+    pub comp_canon: isize, /* -1,0,1 according as code at eqlev_canon+1 is <,==,> that for bsf leaf.  Also used for similar purpose during leaf processing */
     pub samerows: usize, /* number of rows of canong which are correct for the bsf leaf  BDM:correct description? */
     pub canonlevel: usize, /* level of bsf leaf */
+    pub stabvertex: usize, /* point fixed in ancestor of first leaf at level gca_canon */
     pub cosetindex: usize, /* the point being fixed at level gca_first */
     pub needshortprune: bool, /* used to flag calls to shortprune */
 
@@ -799,7 +800,7 @@ fn firstpathnode(
 // 561
 fn firstpathnode_nest(
     mut g_arg: &Graph,
-    mut partition: &mut Partition,
+    partition: &mut Partition,
     mut active: &mut Set,
     firstcode: &mut Vec<usize>,
     stats: &mut StatBlk,
@@ -809,31 +810,35 @@ fn firstpathnode_nest(
     nauty_env: &mut NautyEnv,
     options: &OptionBlk,
 ) -> usize {
-    let tv: usize;
-    let tv1: usize;
     let index: usize;
-    let rtnlevel: usize;
-    let tc: isize; // target cell
+    let mut rtnlevel: usize;
     let childcount: usize;
     let mut qinvar: usize = 0;
     let mut refcode: usize = 0;
+    let mut partition = partition;
     let level = partition.level;
     let cheapautom = partition.cheapautom();
 
     stats.numnodes += 1;
 
     /* refine partition : */
-    doref_nest(g_arg, partition, &mut qinvar, &mut active, &mut refcode);
+    doref_nest(
+        g_arg,
+        &mut partition,
+        &mut qinvar,
+        &mut active,
+        &mut refcode,
+    );
     firstcode[partition.level] = refcode;
     if qinvar > 0 {
         todo!("qinvar always == 0");
     }
     if partition.is_discrete() {
-        firstterminal(partition, stats, nauty_env, options.getcanon);
+        firstterminal(&mut partition, stats, nauty_env, options.getcanon);
         return partition.level - 1;
     }
 
-    let mut tcell = maketargetcell_mut(&g_arg, partition, tc_level, None);
+    let tcell = maketargetcell(&g_arg, &mut partition, tc_level, None);
     stats.tctotal += tcell.len();
     firsttc.set(level, tcell.first_lab_index);
     if nauty_env.noncheaplevel >= level && !cheapautom {
@@ -842,20 +847,122 @@ fn firstpathnode_nest(
 
     /* use the elements of the target cell to produce the children: */
     let mut index = 0;
-    let childcount = 0;
-    let tv1 = tcell.first_lab_index;
+    let mut childcount = 0;
     let cell_lab = tcell.to_vec();
+    let tv1 = tcell[0];
+    let tc = tcell.first_lab_index;
     for (i, tv) in cell_lab.iter().copied().enumerate() {
         if orbits_arg[tv] == tv {
-            tcell.breakout(tv);
+            partition.breakout(tc, tv);
             nauty_env.fixedpts.add_one(tv);
             nauty_env.cosetindex = tv;
             if tv == tv1 {
-                // let rtnlevel = firstpathnode_nest(
-                //     g_arg, partition, active, firstcode, stats, tc_level, firsttc, orbits_arg,
-                //     nauty_env, options,
-                // );
+                partition.advance();
+                rtnlevel = firstpathnode_nest(
+                    g_arg, partition, active, firstcode, stats, tc_level, firsttc, orbits_arg,
+                    nauty_env, options,
+                );
+                childcount = 1;
+                nauty_env.gca_first = level;
+                nauty_env.stabvertex = tv1;
+            } else {
+                partition.advance();
+                rtnlevel = othernode(partition);
+                childcount += 1;
             }
+            if rtnlevel < level {
+                return rtnlevel;
+            }
+            if nauty_env.needshortprune {
+                shortprune(cell_lab)
+            }
+            recover(partition.nest, level)
+        }
+    }
+
+    0
+}
+
+/*****************************************************************************
+*                                                                            *
+*  othernode(lab,ptn,level,numcells) produces a node other than an ancestor  *
+*  of the first leaf.  The parameters describe the level and the colour      *
+*  partition.  The list of active cells is found in the global set 'active'. *
+*  The value returned is the level to return to.                             *
+*                                                                            *
+*  FUNCTIONS CALLED: (*usernodeproc)(),doref(),refine(),recover(),           *
+*                    processnode(),cheapautom(),(*tcellproc)(),shortprune(), *
+*                    nextelement(),breakout(),othernode(),longprune()        *
+*                                                                            *
+*****************************************************************************/
+// 720
+fn othernode(
+    mut g_arg: &Graph,
+    partition: &mut Partition,
+    mut active: &mut Set,
+    stats: &mut StatBlk,
+    tc_level: usize,
+    firsttc: &mut VecMap,
+    orbits_arg: &mut Vec<usize>,
+    nauty_env: &mut NautyEnv,
+    options: &OptionBlk,
+) -> usize {
+    let index: usize;
+    let mut rtnlevel: usize;
+    let childcount: usize;
+    let mut qinvar: usize = 0;
+    let mut refcode: usize = 0;
+    let mut code: u16 = 0;
+    let mut partition = partition;
+    let level = partition.level;
+    let cheapautom = partition.cheapautom();
+
+    stats.numnodes += 1;
+    /* refine partition : */
+    doref_nest(
+        g_arg,
+        &mut partition,
+        &mut qinvar,
+        &mut active,
+        &mut refcode,
+    );
+    code = refcode;
+
+    if qinvar > 0 {
+        nauty_env.invapplics += 1;
+        if qinvar == 2 {
+            nauty_env.invsuccesses += 1;
+            if level < nauty_env.invarsuclevel {
+                nauty_env.invarsuclevel = level;
+            }
+        }
+    }
+
+    if nauty_env.eqlev_first == level - 1 && code == nauty_env.firstcode[level] {
+        nauty_env.eqlev_first = level;
+    }
+    if options.getcanon != 0 {
+        if nauty_env.eqlev_canon == level as isize - 1 {
+            if code < nauty_env.canoncode[level] {
+                nauty_env.comp_canon = -1;
+            } else if code > nauty_env.canoncode[level] {
+                nauty_env.comp_canon = 1;
+            } else {
+                nauty_env.comp_canon = 0;
+                nauty_env.eqlev_canon = level as isize;
+            }
+        }
+        if nauty_env.comp_canon > 0 {
+            nauty_env.canoncode[level] = code;
+        }
+    }
+
+    let tc = -1;
+    if !partition.is_discrete()
+        && (nauty_env.eqlev_first == level || (options.getcanon != 0 && nauty_env.comp_canon >= 0))
+    {
+        if options.getcanon == 0 || nauty_env.comp_canon < 0 {
+            maketargetcell();
         }
     }
 

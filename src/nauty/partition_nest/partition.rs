@@ -5,6 +5,7 @@ use crate::nauty::partition_nest::partition::cell_mut::CellMut;
 use crate::nauty::{Graph, Set};
 use bitvec::bitvec;
 use bitvec::order::Msb0;
+use std::mem::{replace, swap, take};
 use std::ops::Index;
 
 pub mod cell;
@@ -191,6 +192,43 @@ impl Partition {
             }
         }
         k <= nnt + 1 || k <= 4
+    }
+
+    /*****************************************************************************
+     *                                                                            *
+     *  breakout(lab,ptn,level,tc,tv,active,m) operates on the partition at       *
+     *  the specified level in the partition nest (lab,ptn).  It finds the        *
+     *  element tv, which is in the cell C starting at index tc in lab (it had    *
+     *  better be) and splits C in the two cells {tv} and C\{tv}, in that order.  *
+     *  It also sets the set active to contain just the element tc.               *
+     *                                                                            *
+     *  GLOBALS ACCESSED: bit<r>                                                  *
+     *                                                                            *
+     *****************************************************************************/
+    // nautil.c 613
+    /// Operate at level + 1, isolate vertex tv in one cell, and other ones
+    /// in another.
+    pub fn breakout(&mut self, tc: usize, tv: usize) {
+        let lab = &mut self.nest.lab;
+        let mut tmp = tv;
+        swap(&mut tmp, &mut lab[tc]);
+        let mut i = tc + 1;
+        while tmp != tv {
+            swap(&mut tmp, &mut lab[i]);
+            i += 1;
+        }
+        self.nest.ptn[tc] = self.level + 1;
+    }
+
+    pub fn advance(&mut self) {
+        self.level += 1;
+    }
+
+    pub fn next(self) -> Self {
+        Self {
+            nest: self.nest,
+            level: self.level + 1,
+        }
     }
 }
 
