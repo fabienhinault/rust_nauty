@@ -2,7 +2,7 @@ use crate::{
     nautil::SetWordNautilTrait,
     nauty::{
         Set, SetTrait,
-        modname::{self, Graph},
+        graph::{self, Graph},
         partition_nest::partition::{
             Partition,
             cell::Cell,
@@ -37,7 +37,7 @@ fn cleanup(l: usize) -> usize {
 *  (i.e., g^perm = g).  Symmetry is assumed unless digraph = TRUE.           *
 *                                                                            *
 *****************************************************************************/
-pub fn isautom(g: &modname::Graph, perm: &[usize]) -> bool {
+pub fn isautom(g: &graph::Graph, perm: &[usize]) -> bool {
     for (i_row, row) in g.0.iter().enumerate() {
         let p_row = g.get(perm[i_row]);
         for pos in row.masked(i_row).ones_iter() {
@@ -74,7 +74,7 @@ pub fn isautom(g: &modname::Graph, perm: &[usize]) -> bool {
 ///    active: &mut Set,         vertices not fixed yet
 ///    code: &mut usize,         
 pub fn refine_nest(
-    g: &modname::Graph,
+    g: &graph::Graph,
     partition: &mut Partition,
     active: &mut Set,
     code: &mut usize,
@@ -182,7 +182,7 @@ pub fn refine_nest(
 ///    code: &mut usize,         
 #[allow(clippy::too_many_arguments)]
 fn refine(
-    g: &mut modname::Graph,
+    g: &mut graph::Graph,
     lab: &mut [usize],
     ptn: &mut [usize],
     level: usize,
@@ -377,7 +377,7 @@ fn refine(
 *****************************************************************************/
 // 621
 pub fn targetcell<'a>(
-    g: &modname::Graph,
+    g: &graph::Graph,
     partition: &'a Partition,
     hint: Option<usize>,
     tc_level: usize,
@@ -396,7 +396,7 @@ pub fn targetcell<'a>(
 }
 
 pub fn targetcell_mut<'a>(
-    g: &modname::Graph,
+    g: &graph::Graph,
     partition: &'a mut Partition,
     hint: Option<usize>,
     tc_level: usize,
@@ -455,7 +455,7 @@ mod test {
     #[test_case(Graph::no_edge(4), &[1, 0, 2, 3], &[2, 3, NAUTY_INFINITY, 0], 3, 3, &[0, 2, 1], u32_to_bitvec(1073741824, 4), 1431812424, &[1, 0, 3, 2], &[2, 3, NAUTY_INFINITY, 0], 3, &[0, 2, 1], bitvec![usize, Msb0; 0; 4], 64)]
     #[allow(clippy::too_many_arguments)]
     fn test_no_nest(
-        mut g: modname::Graph,
+        mut g: graph::Graph,
         lab: &[usize],
         ptn: &[usize],
         level: usize,
@@ -516,7 +516,7 @@ mod test {
     #[test_case(Graph::no_edge(4), &[0, 1, 2, 3], &[2, 3, NAUTY_INFINITY, 0], 3, 3, u32_to_bitvec(1073741824, 4), 21845, &[0, 1, 3, 2], &[2, 3, NAUTY_INFINITY, 0], 3,  bitvec![usize, Msb0; 0; 4], 64)]
     #[allow(clippy::too_many_arguments)]
     fn test_nest(
-        mut g: modname::Graph,
+        mut g: graph::Graph,
         lab: &[usize],
         ptn: &[usize],
         level: usize,

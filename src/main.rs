@@ -3,9 +3,9 @@ use cli::GengCli;
 use env::Env;
 use geng::Extender;
 use level_data::LevelData;
-use nauty::{WORDSIZE, modname::Graph};
+use nauty::{WORDSIZE, graph::Graph};
 
-use crate::nauty::modname;
+use crate::nauty::graph;
 
 pub mod cli;
 mod env;
@@ -37,7 +37,7 @@ fn main() {
     }
     let mut ecount = vec![0; 1 + maxn * (maxn - 1)];
 
-    let mut _g = modname::Graph::default();
+    let mut _g = graph::Graph::default();
     let mut _deg: [usize; 1] = [0];
 
     let connec: u8;

@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use crate::{
     gtools::g6error::G6Error,
-    nauty::modname::{self, Graph},
+    nauty::graph::{self, Graph},
 };
 
 use super::g6char::G6Char;
@@ -19,7 +19,7 @@ const MAXBYTE: u8 = 126;
 const C6MASK: usize = 63;
 
 impl G6String {
-    pub fn from(g: &modname::Graph) -> Self {
+    pub fn from(g: &graph::Graph) -> Self {
         g.into()
     }
 
@@ -58,8 +58,8 @@ impl Display for G6String {
     }
 }
 
-impl From<&modname::Graph> for G6String {
-    fn from(g: &modname::Graph) -> Self {
+impl From<&graph::Graph> for G6String {
+    fn from(g: &graph::Graph) -> Self {
         let mut g6_string = Self::new(g.n());
         for (i_row, row) in g.0.iter().enumerate() {
             for i_other_vertex in 0..i_row {

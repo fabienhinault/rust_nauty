@@ -134,7 +134,7 @@ pub const NAUTY_INFINITY_I: isize = 2_000_000_002; /* Max graph size is 2 billio
 // the BitVec of index i has the vertices adjascent to vertex of index i.
 // g.0[i][j] == 1 iff (i, j) is an edge of g.
 pub type Set = BitVec<usize, Msb0>;
-pub mod modname {
+pub mod graph {
     use bitvec::order::Msb0;
 
     use bitvec::vec::BitVec;
@@ -264,13 +264,13 @@ impl Iterator for SetIterator {
     }
 }
 
-impl IndexMut<usize> for modname::Graph {
+impl IndexMut<usize> for graph::Graph {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         &mut self.0[index]
     }
 }
 
-impl Index<usize> for modname::Graph {
+impl Index<usize> for graph::Graph {
     type Output = Set;
 
     fn index(&self, index: usize) -> &Self::Output {
@@ -310,7 +310,7 @@ fn bitvec_from_closure<F: Fn(usize, usize, usize) -> bool + Copy>(
     result
 }
 
-impl modname::Graph {
+impl graph::Graph {
     // graph with one vertex and no edge
     pub fn one() -> Self {
         Self(vec![bitvec![usize, Msb0; 0; 1]])
@@ -325,7 +325,7 @@ impl modname::Graph {
     }
 
     pub fn from_f(vertex_count: usize, f: fn(usize, usize, usize) -> bool) -> Self {
-        modname::Graph(
+        graph::Graph(
             (0..vertex_count)
                 .map(|i| bitvec_from_f(vertex_count, i, f))
                 .collect(),
@@ -345,7 +345,7 @@ impl modname::Graph {
         vertex_count: usize,
         f: F,
     ) -> Self {
-        modname::Graph(
+        graph::Graph(
             (0..vertex_count)
                 .map(|i| bitvec_from_closure(vertex_count, i, f))
                 .collect(),
@@ -367,7 +367,7 @@ impl modname::Graph {
             bv2.extend(bv.iter());
             bv2
         }));
-        modname::Graph(upper)
+        graph::Graph(upper)
     }
 
     pub fn n(&self) -> usize {
@@ -425,7 +425,7 @@ impl modname::Graph {
 
     pub(crate) fn from_u32(input: &[u32]) -> Self {
         let n = input.len();
-        modname::Graph(input.iter().map(|&u| u32_to_bitvec(u, n)).collect())
+        graph::Graph(input.iter().map(|&u| u32_to_bitvec(u, n)).collect())
     }
 
     pub fn canonise(&self) -> Self {
@@ -641,14 +641,14 @@ impl NautyEnv {
 *                                                                            *
 *****************************************************************************/
 fn nauty(
-    g_arg: modname::Graph,
+    g_arg: graph::Graph,
     lab: &mut [usize],
     ptn: &mut [usize],
     active_arg: &Set,
     orbits_arg: &mut Vec<usize>,
     options: &OptionBlk,
     _stats_arg: &mut StatBlk,
-    _canong_arg: &mut modname::Graph,
+    _canong_arg: &mut graph::Graph,
 ) -> Result<(), u8> {
     let n = g_arg.n();
     let mut nauty_env = NautyEnv::new(n);
@@ -694,8 +694,8 @@ fn nauty(
             }
         }
     }
-    let mut g: modname::Graph;
-    let mut cannong: modname::Graph;
+    let mut g: graph::Graph;
+    let mut cannong: graph::Graph;
     _initstatus = 0;
 
     *orbits_arg = (0..n).collect();
@@ -742,7 +742,7 @@ fn nauty(
 *                                                                            *
 *****************************************************************************/
 fn firstpathnode(
-    _g_arg: modname::Graph,
+    _g_arg: graph::Graph,
     _lab: &mut [usize],
     _ptn: &mut [usize],
     _level: usize,
@@ -806,7 +806,7 @@ fn firstpathnode(
 *****************************************************************************/
 // 561
 fn firstpathnode_nest(
-    mut g_arg: &modname::Graph,
+    mut g_arg: &graph::Graph,
     partition: &mut Partition,
     mut active: &mut Set,
     firstcode: &mut Vec<usize>,
@@ -911,7 +911,7 @@ fn firstpathnode_nest(
 *****************************************************************************/
 // 720
 fn othernode(
-    mut g_arg: &modname::Graph,
+    mut g_arg: &graph::Graph,
     partition: &mut Partition,
     mut active: &mut Set,
     stats: &mut StatBlk,
@@ -1061,7 +1061,7 @@ fn firstterminal(
 *****************************************************************************/
 // 923
 fn processnode(
-    g: &modname::Graph,
+    g: &graph::Graph,
     partition: &Partition,
     nauty_env: &mut NautyEnv,
     options: &OptionBlk,
