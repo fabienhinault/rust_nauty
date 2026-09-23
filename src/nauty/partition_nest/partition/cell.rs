@@ -1,5 +1,5 @@
 use super::Partition;
-use crate::nauty::{Graph, Set, SetTrait};
+use crate::nauty::{Set, SetTrait, modname::Graph};
 use bitvec::{bitvec, order::Msb0};
 use std::ops::Index;
 

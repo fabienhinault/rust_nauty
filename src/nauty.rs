@@ -46,6 +46,7 @@ use crate::{
         g6error::G6Error,
         g6string::{G6String, graph_size},
     },
+    naugraph::isautom,
     nautil::{doref_nest, maketargetcell, maketargetcell_mut},
     nauty::partition_nest::{
         PartitionNest,
@@ -133,8 +134,14 @@ pub const NAUTY_INFINITY_I: isize = 2_000_000_002; /* Max graph size is 2 billio
 // the BitVec of index i has the vertices adjascent to vertex of index i.
 // g.0[i][j] == 1 iff (i, j) is an edge of g.
 pub type Set = BitVec<usize, Msb0>;
-#[derive(Default, PartialEq, Debug, Clone)]
-pub struct Graph(pub Vec<BitVec<usize, Msb0>>);
+pub mod modname {
+    use bitvec::order::Msb0;
+
+    use bitvec::vec::BitVec;
+
+    #[derive(Default, PartialEq, Debug, Clone)]
+    pub struct Graph(pub Vec<BitVec<usize, Msb0>>);
+}
 pub type NautyCounter = u128;
 
 pub trait SetTrait {
@@ -257,13 +264,13 @@ impl Iterator for SetIterator {
     }
 }
 
-impl IndexMut<usize> for Graph {
+impl IndexMut<usize> for modname::Graph {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         &mut self.0[index]
     }
 }
 
-impl Index<usize> for Graph {
+impl Index<usize> for modname::Graph {
     type Output = Set;
 
     fn index(&self, index: usize) -> &Self::Output {
@@ -303,7 +310,7 @@ fn bitvec_from_closure<F: Fn(usize, usize, usize) -> bool + Copy>(
     result
 }
 
-impl Graph {
+impl modname::Graph {
     // graph with one vertex and no edge
     pub fn one() -> Self {
         Self(vec![bitvec![usize, Msb0; 0; 1]])
@@ -318,7 +325,7 @@ impl Graph {
     }
 
     pub fn from_f(vertex_count: usize, f: fn(usize, usize, usize) -> bool) -> Self {
-        Graph(
+        modname::Graph(
             (0..vertex_count)
                 .map(|i| bitvec_from_f(vertex_count, i, f))
                 .collect(),
@@ -338,7 +345,7 @@ impl Graph {
         vertex_count: usize,
         f: F,
     ) -> Self {
-        Graph(
+        modname::Graph(
             (0..vertex_count)
                 .map(|i| bitvec_from_closure(vertex_count, i, f))
                 .collect(),
@@ -360,7 +367,7 @@ impl Graph {
             bv2.extend(bv.iter());
             bv2
         }));
-        Graph(upper)
+        modname::Graph(upper)
     }
 
     pub fn n(&self) -> usize {
@@ -418,7 +425,7 @@ impl Graph {
 
     pub(crate) fn from_u32(input: &[u32]) -> Self {
         let n = input.len();
-        Graph(input.iter().map(|&u| u32_to_bitvec(u, n)).collect())
+        modname::Graph(input.iter().map(|&u| u32_to_bitvec(u, n)).collect())
     }
 
     pub fn canonise(&self) -> Self {
@@ -634,24 +641,24 @@ impl NautyEnv {
 *                                                                            *
 *****************************************************************************/
 fn nauty(
-    g_arg: Graph,
+    g_arg: modname::Graph,
     lab: &mut [usize],
     ptn: &mut [usize],
     active_arg: &Set,
     orbits_arg: &mut Vec<usize>,
     options: &OptionBlk,
-    stats_arg: &mut StatBlk,
-    canong_arg: &mut Graph,
+    _stats_arg: &mut StatBlk,
+    _canong_arg: &mut modname::Graph,
 ) -> Result<(), u8> {
     let n = g_arg.n();
     let mut nauty_env = NautyEnv::new(n);
 
     let mut numcells: usize;
-    let mut initstatus: u8;
+    let mut _initstatus: u8;
 
-    let defltwork: Vec<Set>;
+    let _defltwork: Vec<Set>;
     let mut firstcode: Vec<usize> = vec![0; n + 2];
-    let canoncode: Vec<u8>;
+    let _canoncode: Vec<u8>;
     let mut firsttc: VecMap = VecMap::new();
     let mut active: Set;
 
@@ -687,9 +694,9 @@ fn nauty(
             }
         }
     }
-    let mut g: Graph;
-    let mut cannong: Graph;
-    initstatus = 0;
+    let mut g: modname::Graph;
+    let mut cannong: modname::Graph;
+    _initstatus = 0;
 
     *orbits_arg = (0..n).collect();
     let mut stats: StatBlk = StatBlk::new(n);
@@ -735,24 +742,24 @@ fn nauty(
 *                                                                            *
 *****************************************************************************/
 fn firstpathnode(
-    g_arg: Graph,
-    lab: &mut [usize],
-    ptn: &mut [usize],
-    level: usize,
-    numcells: usize,
+    _g_arg: modname::Graph,
+    _lab: &mut [usize],
+    _ptn: &mut [usize],
+    _level: usize,
+    _numcells: usize,
     stats: &mut StatBlk,
-    firsttc: &mut VecMap,
+    _firsttc: &mut VecMap,
 ) -> Result<(), u8> {
-    let tv: usize;
-    let tv1: usize;
-    let index: usize;
-    let rtnlevel: usize;
-    let tcellsize: usize;
-    let tc: usize;
-    let childcount: usize;
-    let qinvar: usize;
-    let refcode: usize;
-    let mut tcell: &mut Set;
+    let _tv: usize;
+    let _tv1: usize;
+    let _index: usize;
+    let _rtnlevel: usize;
+    let _tcellsize: usize;
+    let _tc: usize;
+    let _childcount: usize;
+    let _qinvar: usize;
+    let _refcode: usize;
+    let mut _tcell: &mut Set;
 
     stats.numnodes += 1;
 
@@ -799,7 +806,7 @@ fn firstpathnode(
 *****************************************************************************/
 // 561
 fn firstpathnode_nest(
-    mut g_arg: &Graph,
+    mut g_arg: &modname::Graph,
     partition: &mut Partition,
     mut active: &mut Set,
     firstcode: &mut Vec<usize>,
@@ -810,9 +817,9 @@ fn firstpathnode_nest(
     nauty_env: &mut NautyEnv,
     options: &OptionBlk,
 ) -> usize {
-    let index: usize;
-    let mut rtnlevel: usize;
-    let childcount: usize;
+    let _index: usize;
+    let mut rtnlevel: usize = 0;
+    let _childcount: usize;
     let mut qinvar: usize = 0;
     let mut refcode: usize = 0;
     let mut partition = partition;
@@ -833,6 +840,13 @@ fn firstpathnode_nest(
     if qinvar > 0 {
         todo!("qinvar always == 0");
     }
+    if !partition.is_discrete() {
+        let tcell = maketargetcell(&g_arg, &mut partition, tc_level, None);
+        stats.tctotal += tcell.len();
+        nauty_env.firsttc[level] = tcell.first_lab_index as isize;
+    } else {
+        nauty_env.firsttc[level] = -1;
+    }
     if partition.is_discrete() {
         firstterminal(&mut partition, stats, nauty_env, options.getcanon);
         return partition.level - 1;
@@ -846,8 +860,8 @@ fn firstpathnode_nest(
     }
 
     /* use the elements of the target cell to produce the children: */
-    let mut index = 0;
-    let mut childcount = 0;
+    let mut _index = 0;
+    let mut _childcount = 0;
     let cell_lab = tcell.to_vec();
     let tv1 = tcell[0];
     let tc = tcell.first_lab_index;
@@ -862,21 +876,21 @@ fn firstpathnode_nest(
                     g_arg, partition, active, firstcode, stats, tc_level, firsttc, orbits_arg,
                     nauty_env, options,
                 );
-                childcount = 1;
+                _childcount = 1;
                 nauty_env.gca_first = level;
                 nauty_env.stabvertex = tv1;
             } else {
                 partition.advance();
-                rtnlevel = othernode(partition);
-                childcount += 1;
+                //                rtnlevel = othernode(partition);
+                _childcount += 1;
             }
             if rtnlevel < level {
                 return rtnlevel;
             }
             if nauty_env.needshortprune {
-                shortprune(cell_lab)
+                //                shortprune(cell_lab)
             }
-            recover(partition.nest, level)
+            //            recover(partition.nest, level)
         }
     }
 
@@ -897,7 +911,7 @@ fn firstpathnode_nest(
 *****************************************************************************/
 // 720
 fn othernode(
-    mut g_arg: &Graph,
+    mut g_arg: &modname::Graph,
     partition: &mut Partition,
     mut active: &mut Set,
     stats: &mut StatBlk,
@@ -907,15 +921,15 @@ fn othernode(
     nauty_env: &mut NautyEnv,
     options: &OptionBlk,
 ) -> usize {
-    let index: usize;
-    let mut rtnlevel: usize;
-    let childcount: usize;
+    let _index: usize;
+    let mut _rtnlevel: usize;
+    let _childcount: usize;
     let mut qinvar: usize = 0;
     let mut refcode: usize = 0;
     let mut code: u16 = 0;
     let mut partition = partition;
     let level = partition.level;
-    let cheapautom = partition.cheapautom();
+    let _cheapautom = partition.cheapautom();
 
     stats.numnodes += 1;
     /* refine partition : */
@@ -926,7 +940,7 @@ fn othernode(
         &mut active,
         &mut refcode,
     );
-    code = refcode;
+    code = refcode as u16;
 
     if qinvar > 0 {
         nauty_env.invapplics += 1;
@@ -957,13 +971,20 @@ fn othernode(
         }
     }
 
-    let tc = -1;
+    let tc: isize = -1;
     if !partition.is_discrete()
         && (nauty_env.eqlev_first == level || (options.getcanon != 0 && nauty_env.comp_canon >= 0))
     {
+        let tcell;
         if options.getcanon == 0 || nauty_env.comp_canon < 0 {
-            maketargetcell();
+            tcell = maketargetcell(&g_arg, &mut partition, tc_level, Some(firsttc.get(level)));
+            if tc != firsttc.get(level) as isize {
+                nauty_env.eqlev_first = level - 1;
+            }
+        } else {
+            tcell = maketargetcell(&g_arg, &mut partition, tc_level, None);
         }
+        stats.tctotal += tcell.len();
     }
 
     0
@@ -1005,4 +1026,72 @@ fn firstterminal(
         nauty_env.canoncode[level + 1] = 0o77777;
         stats.canupdates = 1;
     }
+}
+
+/*****************************************************************************
+*                                                                            *
+*  Process a node other than the first leaf or its ancestors.  It is first   *
+*  classified into one of five types and then action is taken appropriate    *
+*  to that type.  The types are                                              *
+*                                                                            *
+*  0:   Nothing unusual.  This is just a node internal to the tree whose     *
+*         children need to be generated sometime.                            *
+*  1:   This is a leaf equivalent to the first leaf.  The mapping from       *
+*         firstlab to lab is thus an automorphism.  After processing the     *
+*         automorphism, we can return all the way to the closest invocation  *
+*         of firstpathnode.                                                  *
+*  2:   This is a leaf equivalent to the bsf leaf.  Again, we have found an  *
+*         automorphism, but it may or may not be as useful as one from a     *
+*         type-1 node.  Return as far up the tree as possible.               *
+*  3:   This is a new bsf node, provably better than the previous bsf node.  *
+*         After updating canonlab etc., treat it the same as type 4.         *
+*  4:   This is a leaf for which we can prove that no descendant is          *
+*         equivalent to the first or bsf leaf or better than the bsf leaf.   *
+*         Return up the tree as far as possible, but this may only be by     *
+*         one level.                                                         *
+*                                                                            *
+*  Types 2 and 3 can't occur if getcanon==FALSE.                             *
+*  The value returned is the level in the tree to return to, which can be    *
+*  anywhere up to the closest invocation of firstpathnode.                   *
+*                                                                            *
+*  FUNCTIONS CALLED:    isautom(),updatecan(),testcanlab(),fmperm(),         *
+*                       writeperm(),(*userautomproc)(),orbjoin(),            *
+*                       shortprune(),fmptn()                                 *
+*                                                                            *
+*****************************************************************************/
+// 923
+fn processnode(
+    g: &modname::Graph,
+    partition: &Partition,
+    nauty_env: &mut NautyEnv,
+    options: &OptionBlk,
+) -> usize {
+    let mut code: u8 = 0;
+    let mut newlevel: usize = 0;
+
+    if nauty_env.eqlev_first != partition.level
+        && (options.getcanon == 0 || nauty_env.comp_canon < 0)
+    {
+        code = 4;
+    } else if partition.is_discrete() {
+        if nauty_env.eqlev_first == partition.level {
+            let perm = partition.permutation(&nauty_env.first_partition);
+            if nauty_env.gca_first >= nauty_env.noncheaplevel || isautom(g, &perm) {
+                code = 1;
+            }
+        }
+    }
+    if code == 0 {
+        if options.getcanon != 0 {
+            let mut sr = 0;
+            if nauty_env.comp_canon == 0 {
+                if partition.level < nauty_env.canonlevel {
+                    nauty_env.comp_canon = 1;
+                } else {
+                }
+            }
+        }
+    }
+
+    newlevel
 }

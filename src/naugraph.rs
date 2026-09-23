@@ -1,7 +1,8 @@
 use crate::{
     nautil::SetWordNautilTrait,
     nauty::{
-        Graph, Set, SetTrait,
+        Set, SetTrait,
+        modname::{self, Graph},
         partition_nest::partition::{
             Partition,
             cell::Cell,
@@ -36,7 +37,7 @@ fn cleanup(l: usize) -> usize {
 *  (i.e., g^perm = g).  Symmetry is assumed unless digraph = TRUE.           *
 *                                                                            *
 *****************************************************************************/
-fn is_autom(g: &Graph, perm: &[usize]) -> bool {
+pub fn isautom(g: &modname::Graph, perm: &[usize]) -> bool {
     for (i_row, row) in g.0.iter().enumerate() {
         let p_row = g.get(perm[i_row]);
         for pos in row.masked(i_row).ones_iter() {
@@ -72,7 +73,12 @@ fn is_autom(g: &Graph, perm: &[usize]) -> bool {
 ///    count: &mut Vec<usize>,   number of vertices in cells
 ///    active: &mut Set,         vertices not fixed yet
 ///    code: &mut usize,         
-pub fn refine_nest(g: &Graph, partition: &mut Partition, active: &mut Set, code: &mut usize) {
+pub fn refine_nest(
+    g: &modname::Graph,
+    partition: &mut Partition,
+    active: &mut Set,
+    code: &mut usize,
+) {
     let mut split1: usize;
     let mut split2: usize;
     let mut longcode: usize;
@@ -176,7 +182,7 @@ pub fn refine_nest(g: &Graph, partition: &mut Partition, active: &mut Set, code:
 ///    code: &mut usize,         
 #[allow(clippy::too_many_arguments)]
 fn refine(
-    g: &mut Graph,
+    g: &mut modname::Graph,
     lab: &mut [usize],
     ptn: &mut [usize],
     level: usize,
@@ -371,7 +377,7 @@ fn refine(
 *****************************************************************************/
 // 621
 pub fn targetcell<'a>(
-    g: &Graph,
+    g: &modname::Graph,
     partition: &'a Partition,
     hint: Option<usize>,
     tc_level: usize,
@@ -390,7 +396,7 @@ pub fn targetcell<'a>(
 }
 
 pub fn targetcell_mut<'a>(
-    g: &Graph,
+    g: &modname::Graph,
     partition: &'a mut Partition,
     hint: Option<usize>,
     tc_level: usize,
@@ -427,8 +433,8 @@ mod test {
 
     #[test]
     fn test_is_autom() {
-        assert!(is_autom(&cycle(4), &[1, 2, 3, 0]));
-        assert!(!is_autom(&cycle(4), &[1, 0, 2, 3]));
+        assert!(isautom(&cycle(4), &[1, 2, 3, 0]));
+        assert!(!isautom(&cycle(4), &[1, 0, 2, 3]));
     }
 
     //  test_no_nest
@@ -449,7 +455,7 @@ mod test {
     #[test_case(Graph::no_edge(4), &[1, 0, 2, 3], &[2, 3, NAUTY_INFINITY, 0], 3, 3, &[0, 2, 1], u32_to_bitvec(1073741824, 4), 1431812424, &[1, 0, 3, 2], &[2, 3, NAUTY_INFINITY, 0], 3, &[0, 2, 1], bitvec![usize, Msb0; 0; 4], 64)]
     #[allow(clippy::too_many_arguments)]
     fn test_no_nest(
-        mut g: Graph,
+        mut g: modname::Graph,
         lab: &[usize],
         ptn: &[usize],
         level: usize,
@@ -510,7 +516,7 @@ mod test {
     #[test_case(Graph::no_edge(4), &[0, 1, 2, 3], &[2, 3, NAUTY_INFINITY, 0], 3, 3, u32_to_bitvec(1073741824, 4), 21845, &[0, 1, 3, 2], &[2, 3, NAUTY_INFINITY, 0], 3,  bitvec![usize, Msb0; 0; 4], 64)]
     #[allow(clippy::too_many_arguments)]
     fn test_nest(
-        mut g: Graph,
+        mut g: modname::Graph,
         lab: &[usize],
         ptn: &[usize],
         level: usize,

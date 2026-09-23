@@ -1,4 +1,8 @@
-use crate::{Graph, level_data::LevelData, nauty::NautyCounter};
+use crate::{
+    level_data::LevelData,
+    modname::Graph,
+    nauty::{NautyCounter, modname},
+};
 
 pub struct Extender {
     pub maxn: usize,
@@ -13,7 +17,7 @@ impl Extender {
     /* extend from n to n+1 -- version for general graphs */
     pub fn genextend(
         &mut self,
-        g: &mut Graph,
+        g: &mut modname::Graph,
         n: usize,
         deg: &[usize],
         ne: usize,
@@ -52,7 +56,7 @@ impl Extender {
         let imax = self.data[n].xstart[xub + 1];
         //let x_set_card = &mut data.x_set_card;
         let xorb = &self.data[n].xorb;
-        let mut gx: Graph = Graph::default();
+        let mut gx: modname::Graph = modname::Graph::default();
         if nx == self.maxn {
             for i in imin..imax {
                 if !rigid && xorb[i] != i {
@@ -92,7 +96,14 @@ impl Extender {
     }
 }
 
-fn accept2(g: &mut Graph, n: usize, x: usize, gx: &mut Graph, deg: &[usize], d: bool) -> bool {
+fn accept2(
+    g: &mut modname::Graph,
+    n: usize,
+    x: usize,
+    gx: &mut modname::Graph,
+    deg: &[usize],
+    d: bool,
+) -> bool {
     todo!()
 }
 

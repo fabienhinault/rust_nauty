@@ -1,7 +1,8 @@
 use crate::{
     naugraph::{refine_nest, targetcell, targetcell_mut},
     nauty::{
-        Graph, Set, SetTrait,
+        Set, SetTrait,
+        modname::{self, Graph},
         partition_nest::partition::{Partition, cell::Cell, cell_mut::CellMut},
     },
 };
@@ -95,7 +96,7 @@ impl SetWordNautilTrait for Set {
 
 // case where invarproc is null, dorest just calls refine
 pub fn doref_nest(
-    g: &Graph,
+    g: &modname::Graph,
     partition: &mut Partition,
     qinvar: &mut usize,
     active: &mut Set,
@@ -123,7 +124,7 @@ pub fn doref_nest(
 *****************************************************************************/
 // l565
 pub fn maketargetcell<'a>(
-    g: &Graph,
+    g: &modname::Graph,
     partition: &'a Partition,
     tc_level: usize,
     hint: Option<usize>,
@@ -132,7 +133,7 @@ pub fn maketargetcell<'a>(
 }
 
 pub fn maketargetcell_mut<'a>(
-    g: &Graph,
+    g: &modname::Graph,
     partition: &'a mut Partition,
     tc_level: usize,
     hint: Option<usize>,

@@ -1,4 +1,8 @@
-use crate::nauty::{Graph, Set, VecMap, partition_nest::partition::cell::Cell};
+use crate::nauty::{
+    Set, VecMap,
+    modname::{self, Graph},
+    partition_nest::partition::cell::Cell,
+};
 use std::{
     iter::once,
     mem::swap,
@@ -238,11 +242,11 @@ impl<'a> CellMut<'a> {
         result
     }
 
-    fn splitters_count(&self, splitters: &Set, g: &Graph, i: usize) -> usize {
+    fn splitters_count(&self, splitters: &Set, g: &modname::Graph, i: usize) -> usize {
         (splitters.clone() & g.0[i].clone()).count_ones()
     }
 
-    pub fn split_from_splitters(&mut self, splitters: &Set, g: &Graph) -> SplitResult {
+    pub fn split_from_splitters(&mut self, splitters: &Set, g: &modname::Graph) -> SplitResult {
         let f_results = self.get_f_results(|i: &usize| self.splitters_count(splitters, g, *i));
         if let Some(value) = f_results.is_const() {
             return SplitResult::Const(value);

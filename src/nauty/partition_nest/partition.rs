@@ -1,8 +1,9 @@
 use super::PartitionNest;
 use super::partition_nest_chunk_by::PartitionNestChunkBy;
+use crate::nauty::modname;
 use crate::nauty::partition_nest::partition::cell::Cell;
 use crate::nauty::partition_nest::partition::cell_mut::CellMut;
-use crate::nauty::{Graph, Set};
+use crate::nauty::{Set, modname::Graph};
 use bitvec::bitvec;
 use bitvec::order::Msb0;
 use std::mem::{replace, swap, take};
@@ -131,7 +132,7 @@ impl Partition {
      *                                                                            *
      *****************************************************************************/
     // naugraph.c l530
-    pub fn bestcell<'a>(&'a self, g: &Graph) -> Cell<'a> {
+    pub fn bestcell<'a>(&'a self, g: &modname::Graph) -> Cell<'a> {
         let non_singleton_cells: Vec<Cell> = self.cells().filter(|c| c.len() > 1).collect();
         let mut neighbours_counts: Vec<usize> = vec![0; non_singleton_cells.len()];
         for v2 in 1..non_singleton_cells.len() {
@@ -159,7 +160,7 @@ impl Partition {
             .expect("bestcell")
     }
 
-    pub fn bestcell_mut(&mut self, g: &Graph) -> CellMut {
+    pub fn bestcell_mut(&mut self, g: &modname::Graph) -> CellMut {
         let i = self.bestcell(g).first_lab_index;
         self.get_cell_mut(i)
     }
@@ -230,6 +231,15 @@ impl Partition {
             level: self.level + 1,
         }
     }
+
+    pub fn permutation(&self, other: &Partition) -> Vec<usize> {
+        assert_eq!(self.len(), other.len());
+        let mut perm = vec![0; self.len()];
+        for i in 0..self.len() {
+            perm[other[i]] = self[i];
+        }
+        perm
+    }
 }
 
 impl Index<usize> for Partition {
@@ -267,7 +277,7 @@ mod test {
     #[test]
     fn test_best_cell() {
         // let g = Graph::from_u32(&[201326592, 67108864, 0, 0, 2147483648, 3221225472]);
-        let g = Graph::from_edges(6, &[(0, 4), (0, 5), (1, 5)]);
+        let g = modname::Graph::from_edges(6, &[(0, 4), (0, 5), (1, 5)]);
         // println!("{}", g.to_matrix());
         // E?b? // println!("{}", g.to_graph6());
         let nest = PartitionNest::new(

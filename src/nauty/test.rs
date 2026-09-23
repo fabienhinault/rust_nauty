@@ -36,11 +36,11 @@ fn test_to_graph6() {
 fn test_from_graph6() {
     assert_eq!(
         create_example(),
-        Graph::from_graph6("DQc".to_owned()).unwrap()
+        modname::Graph::from_graph6("DQc".to_owned()).unwrap()
     );
     assert_eq!(
         create_example(),
-        Graph::from_graph6("DQc\n".to_owned()).unwrap()
+        modname::Graph::from_graph6("DQc\n".to_owned()).unwrap()
     );
 }
 
@@ -68,14 +68,14 @@ fn test_example_isbiconnected() {
 #[test_case(create_diamond())]
 #[test_case(create_complete(4))]
 #[test_case(create_g4g_biconnected())]
-fn test_is_biconnected(biconnected_graph: Graph) {
+fn test_is_biconnected(biconnected_graph: modname::Graph) {
     assert!(biconnected_graph.isbiconnected());
 }
 
 #[test_case(graphs::path(4))]
 #[test_case(create_g4g_not_biconnected())]
 #[test_case(create_D_7dC())]
-fn test_is_not_biconnected(not_biconnected_graph: Graph) {
+fn test_is_not_biconnected(not_biconnected_graph: modname::Graph) {
     // println!("{}", not_biconnected_graph.to_graph6());
     assert!(!not_biconnected_graph.isbiconnected());
 }
@@ -102,8 +102,8 @@ fn test_without_loop_not_isbiconnected() {
 
 #[test]
 fn test_create_from_u32() {
-    let actual = Graph::from_u32(&[1610612736, 2684354560, 3221225472]);
-    let expected = Graph(vec![
+    let actual = modname::Graph::from_u32(&[1610612736, 2684354560, 3221225472]);
+    let expected = modname::Graph(vec![
         //                   0  1  2
         bitvec![usize, Msb0; 0, 1, 1],
         bitvec![usize, Msb0; 1, 0, 1],
@@ -150,7 +150,7 @@ fn test_wheel() {
 
 #[test]
 fn test_join() {
-    let g = Graph::join(&Graph::one(), &graphs::path(3));
+    let g = modname::Graph::join(&modname::Graph::one(), &graphs::path(3));
     println!("{}", g.to_matrix());
     assert_eq!(g, create_diamond());
 }
@@ -159,8 +159,8 @@ fn test_join() {
 //
 //  2---0---4---3---1
 //
-fn create_example() -> Graph {
-    Graph(vec![
+fn create_example() -> modname::Graph {
+    modname::Graph(vec![
         //                   0  1  2  3  4
         bitvec![usize, Msb0; 0, 0, 1, 0, 1],
         bitvec![usize, Msb0; 0, 0, 0, 1, 0],
@@ -171,8 +171,8 @@ fn create_example() -> Graph {
 }
 
 //  2---0   4---3---1
-fn create_disconnected() -> Graph {
-    Graph(vec![
+fn create_disconnected() -> modname::Graph {
+    modname::Graph(vec![
         //                   0  1  2  3  4
         bitvec![usize, Msb0; 0, 0, 1, 0, 0],
         bitvec![usize, Msb0; 0, 0, 0, 1, 0],
@@ -182,15 +182,15 @@ fn create_disconnected() -> Graph {
     ])
 }
 
-pub fn create_pentagram() -> Graph {
-    Graph::from_f(5, |i_current_vertex, i_other_vertex, _n| {
+pub fn create_pentagram() -> modname::Graph {
+    modname::Graph::from_f(5, |i_current_vertex, i_other_vertex, _n| {
         i_other_vertex == (i_current_vertex + 3).rem_euclid(5)
             || i_other_vertex == (i_current_vertex + 2).rem_euclid(5)
     })
 }
 
-pub fn create_from_offsets(vertices_count: usize, offsets: &[usize]) -> Graph {
-    Graph::from_closure(vertices_count, |i_current_vertex, i_other_vertex, n| {
+pub fn create_from_offsets(vertices_count: usize, offsets: &[usize]) -> modname::Graph {
+    modname::Graph::from_closure(vertices_count, |i_current_vertex, i_other_vertex, n| {
         offsets
             .iter()
             .map(|offset| (i_current_vertex + offset).rem_euclid(n))
@@ -203,8 +203,8 @@ pub fn create_from_offsets(vertices_count: usize, offsets: &[usize]) -> Graph {
 // 0---2
 //  \ /
 //   3
-pub fn create_diamond() -> Graph {
-    Graph(vec![
+pub fn create_diamond() -> modname::Graph {
+    modname::Graph(vec![
         //                   0  1  2  3
         bitvec![usize, Msb0; 0, 1, 1, 1],
         bitvec![usize, Msb0; 1, 0, 1, 0],
@@ -213,12 +213,12 @@ pub fn create_diamond() -> Graph {
     ])
 }
 
-pub fn create_complete(n: usize) -> Graph {
-    Graph((0..n).map(|i| create_complete_bitvec(n, i)).collect())
+pub fn create_complete(n: usize) -> modname::Graph {
+    modname::Graph((0..n).map(|i| create_complete_bitvec(n, i)).collect())
 }
 
-pub fn create_zero(n: usize) -> Graph {
-    Graph::no_edge(n)
+pub fn create_zero(n: usize) -> modname::Graph {
+    modname::Graph::no_edge(n)
 }
 
 fn create_complete_bitvec(n: usize, i: usize) -> Set {
@@ -231,8 +231,8 @@ fn create_complete_bitvec(n: usize, i: usize) -> Set {
 // 1-0--3
 // |/   |
 // 2    4
-fn create_g4g_not_biconnected() -> Graph {
-    Graph(vec![
+fn create_g4g_not_biconnected() -> modname::Graph {
+    modname::Graph(vec![
         //                   0  1  2  3  4
         bitvec![usize, Msb0; 0, 1, 1, 1, 0],
         bitvec![usize, Msb0; 1, 0, 1, 0, 0],
@@ -245,8 +245,8 @@ fn create_g4g_not_biconnected() -> Graph {
 //  1-0--3
 //  |/   |
 //  2----4
-fn create_g4g_biconnected() -> Graph {
-    Graph(vec![
+fn create_g4g_biconnected() -> modname::Graph {
+    modname::Graph(vec![
         //                   0  1  2  3  4
         bitvec![usize, Msb0; 0, 1, 1, 1, 0],
         bitvec![usize, Msb0; 1, 0, 1, 0, 0],
@@ -262,8 +262,8 @@ fn create_g4g_biconnected() -> Graph {
 //  2    4
 //
 // D}C
-fn create_D_7dC() -> Graph {
-    Graph(vec![
+fn create_D_7dC() -> modname::Graph {
+    modname::Graph(vec![
         //                   0  1  2  3  4
         bitvec![usize, Msb0; 0, 1, 1, 1, 0],
         bitvec![usize, Msb0; 1, 0, 1, 1, 0],
@@ -273,8 +273,8 @@ fn create_D_7dC() -> Graph {
     ])
 }
 
-fn create_without_loop() -> Graph {
-    Graph(vec![
+fn create_without_loop() -> modname::Graph {
+    modname::Graph(vec![
         //                   0  1  2  3
         bitvec![usize, Msb0; 0, 1, 1, 1],
         bitvec![usize, Msb0; 1, 0, 0, 0],
