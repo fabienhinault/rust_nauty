@@ -5,7 +5,10 @@ use crate::{
         g6error::G6Error,
         g6string::{G6String, graph_size},
     },
-    nauty::{Set, SetTrait, VecMap, bitvec_from_closure, bitvec_from_f, u32_to_bitvec},
+    nauty::{
+        Set, SetTrait, VecMap, bitvec_from_closure, bitvec_from_f,
+        partition_nest::partition::Partition, u32_to_bitvec,
+    },
 };
 use bitvec::{bitvec, order::Msb0, vec::BitVec};
 
@@ -135,6 +138,54 @@ impl Graph {
         self.clone()
     }
 
+    /*****************************************************************************
+     *                                                                            *
+     *  testcanlab(g,canong,lab,samerows,m,n) compares g^lab to canong,           *
+     *  using an ordering which is immaterial since it's only used here.  The     *
+     *  value returned is -1,0,1 if g^lab <,=,> canong.  *samerows is set to      *
+     *  the number of rows (0..n) of canong which are the same as those of g^lab. *
+     *                                                                            *
+     *  GLOBALS ACCESSED: workset<rw>,permset(),workperm<rw>                      *
+     *                                                                            *
+     *****************************************************************************/
+
+    pub fn testcanlab(&self, canong: &Graph, partition: &Partition, samerows: &mut usize) -> isize {
+        let workperm = partition.permutation1();
+        for i in 0..self.n() {
+            let workset = self.0[partition[i]].permset(&workperm);
+            if workset < canong.0[i] {
+                *samerows = i;
+                return -1;
+            }
+            if workset > canong.0[i] {
+                *samerows = i;
+                return 1;
+            }
+        }
+        *samerows = self.n();
+        return 0;
+    }
+
+    /*****************************************************************************
+     *                                                                            *
+     *  updatecan(g,canong,lab,samerows,m,n) sets canong = g^lab, assuming        *
+     *  the first samerows of canong are ok already.                              *
+     *                                                                            *
+     *  GLOBALS ACCESSED: permset(),workperm<rw>                                  *
+     *                                                                            *
+     *****************************************************************************/
+    // naugraph.c 143
+    pub fn updatecan(&self, partition: &Partition, samerows: usize) -> Self {
+        let workperm = partition.permutation1();
+        let mut canon = self.clone();
+        for i in samerows..self.n() {
+            canon.0[i] = self.0[partition[i]].permset(&workperm);
+        }
+        canon
+    }
+
+    /* test if g is connected */
+    // geng.c 636
     pub fn isconnected(&self) -> bool {
         let n = self.n();
         let allbits = bitvec![1; n];

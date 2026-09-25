@@ -232,7 +232,15 @@ impl Partition {
         }
     }
 
-    pub fn permutation(&self, other: &Partition) -> Vec<usize> {
+    pub fn permutation1(&self) -> Vec<usize> {
+        let mut perm = vec![0; self.len()];
+        for i in 0..self.len() {
+            perm[self[i]] = i;
+        }
+        perm
+    }
+
+    pub fn permutation2(&self, other: &Partition) -> Vec<usize> {
         assert_eq!(self.len(), other.len());
         let mut perm = vec![0; self.len()];
         for i in 0..self.len() {

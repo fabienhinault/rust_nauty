@@ -108,6 +108,41 @@ pub fn doref_nest(
 
 /*****************************************************************************
 *                                                                            *
+*  fmperm(perm,fix,mcr,m,n) uses perm to construct fix and mcr.  fix         *
+*  contains those points are fixed by perm, while mcr contains the set of    *
+*  those points which are least in their orbits.                             *
+*                                                                            *
+*  GLOBALS ACCESSED: bit<r>                                                  *
+*                                                                            *
+*****************************************************************************/
+// 379
+pub fn fmperm(perm: &[usize]) -> (Set, Set) {
+    let mut fix = Set::zeros(perm.len());
+    let mut mcr = Set::zeros(perm.len());
+    let mut workperm = vec![0; perm.len()];
+    for i in 0..perm.len() {
+        if perm[i] == i {
+            fix.set(i, true);
+            mcr.set(i, true);
+        } else if workperm[i] == 0 {
+            let mut l = i;
+            let mut k;
+            loop {
+                k = l;
+                l = perm[l];
+                workperm[k] = 1;
+                if l != i {
+                    break;
+                }
+            }
+            mcr.set(i, true);
+        }
+    }
+    (fix, mcr)
+}
+
+/*****************************************************************************
+*                                                                            *
 *  maketargetcell(g,lab,ptn,level,tcell,tcellsize,&cellpos,                  *
 *                 tc_level,digraph,hint,targetcell,m,n)                      *
 *  calls targetcell() to determine the target cell at the specified level    *

@@ -47,7 +47,7 @@ use crate::{
         g6string::{G6String, graph_size},
     },
     naugraph::isautom,
-    nautil::{doref_nest, maketargetcell, maketargetcell_mut},
+    nautil::{doref_nest, fmperm, maketargetcell, maketargetcell_mut},
     nauty::partition_nest::{
         PartitionNest,
         partition::{Partition, cell::Cell},
@@ -150,6 +150,9 @@ pub trait SetTrait {
     fn rounding_ones_iter(&self, hint: usize) -> RoundingSetIterator;
     fn bit_mask(&self, pos: usize) -> Self;
     fn masked(&self, pos: usize) -> Self;
+    fn permset(&self, perm: &[usize]) -> Self;
+    fn takebit(&mut self) -> usize;
+    fn is_zero(&self) -> bool;
 }
 
 impl SetTrait for Set {
@@ -204,6 +207,35 @@ impl SetTrait for Set {
 
     fn masked(&self, pos: usize) -> Self {
         self.filter(&self.bit_mask(pos))
+    }
+
+    /*****************************************************************************
+     *                                                                            *
+     *  permset(set1,set2,m,perm)  defines set2 to be the set                     *
+     *  {perm[i] | i in set1}.                                                    *
+     *                                                                            *
+     *  GLOBALS ACCESSED: bit<r>,leftbit<r>                                       *
+     *                                                                            *
+     *****************************************************************************/
+    // nautil.c 154
+    fn permset(&self, perm: &[usize]) -> Self {
+        let mut setw = self.clone();
+        let mut set2 = Self::zeros(self.len());
+        while !setw.is_zero() {
+            let b = setw.takebit();
+            set2.set(perm[b], true);
+        }
+        set2
+    }
+
+    fn takebit(&mut self) -> usize {
+        let iw = self.first_bit_nz_index();
+        self.set(iw, false);
+        iw
+    }
+
+    fn is_zero(&self) -> bool {
+        self.first_one().is_none()
     }
 }
 
@@ -373,6 +405,7 @@ pub struct NautyEnv {
     pub firsttc: Vec<isize>,
     pub active: Vec<Set>,
     pub workspace: Vec<Set>, /*work area to hold automorphism data */
+    pub fmptr_index: usize,  /* pointer into workspace */
 }
 
 impl NautyEnv {
@@ -815,6 +848,19 @@ fn firstterminal(
     }
 }
 
+#[derive(PartialEq, Eq)]
+enum ProcessNodeCode {
+    /* lab is equivalent to firstlab */
+    Zero,
+    /* lab is equivalent to firstlab */
+    One(Vec<usize>),
+    /* lab is equivalent to canonlab */
+    Two(Vec<usize>),
+    /* lab is better than canonlab */
+    Three,
+    /* non-automorphism terminal node */
+    Four,
+}
 /*****************************************************************************
 *                                                                            *
 *  Process a node other than the first leaf or its ancestors.  It is first   *
@@ -852,33 +898,70 @@ fn processnode(
     partition: &Partition,
     nauty_env: &mut NautyEnv,
     options: &OptionBlk,
+    stats: &mut StatBlk,
 ) -> usize {
-    let mut code: u8 = 0;
+    let mut canong;
+    let mut code: ProcessNodeCode = ProcessNodeCode::Zero;
     let mut newlevel: usize = 0;
 
     if nauty_env.eqlev_first != partition.level
         && (options.getcanon == 0 || nauty_env.comp_canon < 0)
     {
-        code = 4;
+        code = ProcessNodeCode::Four;
     } else if partition.is_discrete() {
         if nauty_env.eqlev_first == partition.level {
-            let perm = partition.permutation(&nauty_env.first_partition);
-            if nauty_env.gca_first >= nauty_env.noncheaplevel || isautom(g, &perm) {
-                code = 1;
+            let workperm = partition.permutation2(&nauty_env.first_partition);
+            if nauty_env.gca_first >= nauty_env.noncheaplevel || isautom(g, &workperm) {
+                code = ProcessNodeCode::One(workperm);
             }
         }
     }
-    if code == 0 {
+    if code == ProcessNodeCode::Zero {
         if options.getcanon != 0 {
             let mut sr = 0;
             if nauty_env.comp_canon == 0 {
                 if partition.level < nauty_env.canonlevel {
                     nauty_env.comp_canon = 1;
                 } else {
+                    canong = g.updatecan(&nauty_env.canon_partition, nauty_env.samerows);
+                    nauty_env.samerows = g.n();
+                    nauty_env.comp_canon = g.testcanlab(&canong, partition, &mut nauty_env.samerows)
                 }
+            }
+            if nauty_env.comp_canon == 0 {
+                code = ProcessNodeCode::Two(partition.permutation2(&nauty_env.canon_partition));
+            } else if nauty_env.comp_canon > 0 {
+                code = ProcessNodeCode::Three
+            } else {
+                code = ProcessNodeCode::Four;
             }
         }
     }
 
-    newlevel
+    if code != ProcessNodeCode::Zero && partition.level > stats.maxlevel {
+        stats.maxlevel = partition.level
+    }
+
+    match code {
+        /* nothing unusual noticed */
+        ProcessNodeCode::Zero => partition.level,
+        /* lab is equivalent to firstlab */
+        ProcessNodeCode::One(workperm) => {
+            if nauty_env.fmptr_index == nauty_env.workspace.len() {
+                nauty_env.fmptr_index -= 2;
+            }
+            (
+                nauty_env.workspace[nauty_env.fmptr_index],
+                nauty_env.workspace[nauty_env.fmptr_index + 1],
+            ) = fmperm(&workperm);
+            nauty_env.fmptr_index += 2;
+            if options.writeautoms {
+                //writeperm(...);
+            }
+            nauty_env.gca_first
+        }
+        ProcessNodeCode::Two(items) => todo!(),
+        ProcessNodeCode::Three => todo!(),
+        ProcessNodeCode::Four => todo!(),
+    }
 }
