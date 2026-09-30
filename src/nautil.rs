@@ -1,10 +1,14 @@
 use crate::{
     naugraph::{refine_nest, targetcell, targetcell_mut},
     nauty::{
-        Set, SetTrait,
+        NautyEnv, Set, SetTrait,
         graph::{self, Graph},
         partition_nest::partition::{Partition, cell::Cell, cell_mut::CellMut},
     },
+};
+use std::{
+    fs::File,
+    io::{BufWriter, Write},
 };
 
 pub trait SetWordNautilTrait {
@@ -22,6 +26,7 @@ impl SetWordNautilTrait for Set {
      *  GLOBALS ACCESSED: none                                                    *
      *                                                                            *
      *****************************************************************************/
+    // 111
     // should be generally replaced by iteration on Set
     fn next_element(&self, pos: Option<usize>) -> Option<usize> {
         let setwd: Set = match pos {
@@ -33,77 +38,89 @@ impl SetWordNautilTrait for Set {
     }
 }
 
+fn condnl(
+    x: usize,
+    curlen: &mut usize,
+    linelength: Option<usize>,
+    writer: &mut BufWriter<&mut File>,
+) {
+    if let Some(linelength) = linelength
+        && *curlen + x > linelength
+    {
+        write!(writer, "\n   ");
+        *curlen = 3;
+    }
+}
+
 /*****************************************************************************
 *                                                                            *
-*  doref(g,lab,ptn,level,numcells,qinvar,invar,active,code,refproc,          *
-*        invarproc,mininvarlev,maxinvarlev,invararg,digraph,m,n)             *
-*  is used to perform a refinement on the partition at the given level in    *
-*  (lab,ptn).  The number of cells is *numcells both for input and output.   *
-*  The input active is the active set for input to the refinement procedure  *
-*  (*refproc)(), which must have the argument list of refine().              *
-*  active may be arbitrarily changed.  invar is used for working storage.    *
-*  First, (*refproc)() is called.  Then, if invarproc!=NULL and              *
-*  |mininvarlev| <= level <= |maxinvarlev|, the routine (*invarproc)() is    *
-*  used to compute a vertex-invariant which may refine the partition         *
-*  further.  If it does, (*refproc)() is called again, using an active set   *
-*  containing all but the first fragment of each old cell.  Unless g is a    *
-*  digraph, this guarantees that the final partition is equitable.  The      *
-*  arguments invararg and digraph are passed to (*invarproc)()               *
-*  uninterpretted.  The output argument code is a composite of the codes     *
-*  from all the calls to (*refproc)().  The output argument qinvar is set    *
-*  to 0 if (*invarproc)() is not applied, 1 if it is applied but fails to    *
-*  refine the partition, and 2 if it succeeds.                               *
-*  See the file nautinv.c for a further discussion of vertex-invariants.     *
-*  Note that the dreadnaut I command generates a call to  this procedure     *
-*  with level = mininvarlevel = maxinvarlevel = 0.                           *
+*  writeperm(f,perm,cartesian,linelength,n) writes the permutation perm to   *
+*  the file f.  The cartesian representation (i.e. perm itself) is used if   *
+*  cartesian != FALSE; otherwise the cyclic representation is used.  No      *
+*  more than linelength characters (not counting '\n') are written on each   *
+*  line, unless linelength is ridiculously small.  linelength<=0 causes no   *
+*  line breaks at all to be made.  The global int labelorg is added to each  *
+*  vertex number.                                                            *
+*                                                                            *
+*  GLOBALS ACCESSED: itos(),putstring()                                      *
 *                                                                            *
 *****************************************************************************/
-
-// pub fn doref(
-//     g: Graph,
-//     lab: &mut [usize],
-//     ptn: &mut [usize],
-//     level: usize,
-//     numcells: &mut usize,
-//     qinvar: &mut usize,
-//     invar: &mut Vec<usize>,
-//     active: &mut Set,
-//     code: &mut usize,
-//     refproc: RP,
-//     invarproc: IP,
-//     mininvarlev: usize,
-//     maxinvarlev: usize,
-//     invararg: usize,
-//     digraph: bool,
-//     nauty_env: &mut NautyEnv,
-// ) {
-//     let pw: usize;
-//     let i: usize;
-//     let cell1: usize;
-//     let cell2: usize;
-//     let nc: usize;
-//     let tvpos: usize;
-//     let minlev: usize;
-//     let maxlev: usize;
-//     let longcode: usize;
-//     let same: bool;
-//     nauty_env.workperm = Vec::with_capacity(g.n());
-
-//     tvpos = active.first_one().unwrap_or(0);
-
-//     refproc()
-// }
-
-// case where invarproc is null, dorest just calls refine
-pub fn doref_nest(
-    g: &graph::Graph,
-    partition: &mut Partition,
-    qinvar: &mut usize,
-    active: &mut Set,
-    code: &mut usize,
+// 304
+pub fn writeperm(
+    f: &mut File,
+    perm: &[usize],
+    cartesian: bool,
+    linelength: Option<usize>,
+    nauty_env: &NautyEnv,
 ) {
-    refine_nest(g, partition, active, code);
-    *qinvar = 0;
+    let mut writer = BufWriter::new(f);
+    let labelorg = nauty_env.labelorg;
+    if cartesian {
+        let mut curlen = 0;
+        for p in perm {
+            let s = format!("{}", p + labelorg);
+            condnl(s.len() + 1, &mut curlen, linelength, &mut writer);
+            write!(writer, " ").expect("write!");
+            write!(writer, "{s}").expect("write!");
+            curlen += s.len() + 1;
+        }
+        writeln!(writer).expect("writeln!");
+    } else {
+        let mut curlen = 0;
+        let mut workperm = vec![false; perm.len()];
+        for i in 0..perm.len() {
+            if !workperm[i] && perm[i] != i {
+                let mut l = i;
+                let mut s = format!("{}", l + labelorg);
+                if curlen > 3 {
+                    condnl(2 * s.len() + 4, &mut curlen, linelength, &mut writer);
+                    write!(writer, "(").expect("write!");
+                    loop {
+                        write!(writer, "{s}").expect("write!");
+                        curlen += s.len() + 1;
+                        let k = l;
+                        l = perm[l];
+                        workperm[k] = true;
+                        if l != i {
+                            s = format!("{}", l + labelorg);
+                            condnl(s.len(), &mut curlen, linelength, &mut writer);
+                            write!(writer, " ").expect("write!");
+                        }
+                        if l == i {
+                            break;
+                        }
+                    }
+                    write!(writer, ")").expect("write!");
+                    curlen += 1;
+                }
+            }
+        }
+        if curlen == 0 {
+            writeln!(writer, "(1)").expect("write!");
+        } else {
+            writeln!(writer).expect("write!");
+        }
+    }
 }
 
 /*****************************************************************************
@@ -139,6 +156,44 @@ pub fn fmperm(perm: &[usize]) -> (Set, Set) {
         }
     }
     (fix, mcr)
+}
+
+/*****************************************************************************
+*                                                                            *
+*  doref(g,lab,ptn,level,numcells,qinvar,invar,active,code,refproc,          *
+*        invarproc,mininvarlev,maxinvarlev,invararg,digraph,m,n)             *
+*  is used to perform a refinement on the partition at the given level in    *
+*  (lab,ptn).  The number of cells is *numcells both for input and output.   *
+*  The input active is the active set for input to the refinement procedure  *
+*  (*refproc)(), which must have the argument list of refine().              *
+*  active may be arbitrarily changed.  invar is used for working storage.    *
+*  First, (*refproc)() is called.  Then, if invarproc!=NULL and              *
+*  |mininvarlev| <= level <= |maxinvarlev|, the routine (*invarproc)() is    *
+*  used to compute a vertex-invariant which may refine the partition         *
+*  further.  If it does, (*refproc)() is called again, using an active set   *
+*  containing all but the first fragment of each old cell.  Unless g is a    *
+*  digraph, this guarantees that the final partition is equitable.  The      *
+*  arguments invararg and digraph are passed to (*invarproc)()               *
+*  uninterpretted.  The output argument code is a composite of the codes     *
+*  from all the calls to (*refproc)().  The output argument qinvar is set    *
+*  to 0 if (*invarproc)() is not applied, 1 if it is applied but fails to    *
+*  refine the partition, and 2 if it succeeds.                               *
+*  See the file nautinv.c for a further discussion of vertex-invariants.     *
+*  Note that the dreadnaut I command generates a call to  this procedure     *
+*  with level = mininvarlevel = maxinvarlevel = 0.                           *
+*                                                                            *
+*****************************************************************************/
+// 481
+// case where invarproc is null, dorest just calls refine
+pub fn doref_nest(
+    g: &graph::Graph,
+    partition: &mut Partition,
+    qinvar: &mut usize,
+    active: &mut Set,
+    code: &mut usize,
+) {
+    refine_nest(g, partition, active, code);
+    *qinvar = 0;
 }
 
 /*****************************************************************************

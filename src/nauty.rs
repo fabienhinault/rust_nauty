@@ -47,7 +47,7 @@ use crate::{
         g6string::{G6String, graph_size},
     },
     naugraph::isautom,
-    nautil::{doref_nest, fmperm, maketargetcell, maketargetcell_mut},
+    nautil::{doref_nest, fmperm, maketargetcell, maketargetcell_mut, writeperm},
     nauty::partition_nest::{
         PartitionNest,
         partition::{Partition, cell::Cell},
@@ -55,10 +55,13 @@ use crate::{
 };
 use bitvec::{bitvec, order::Msb0, vec::BitVec, view::BitView};
 use std::{
+    cell::RefCell,
     fmt::Debug,
     fs::File,
+    io::Read,
     mem,
     ops::{Index, IndexMut},
+    rc::Rc,
 };
 
 pub mod partition_nest;
@@ -66,19 +69,19 @@ pub mod partition_nest;
 pub mod test;
 
 struct OptionBlk {
-    getcanon: u8,       /* make canong and canonlab? */
-    digraph: bool,      /* multiple edges or loops? */
-    writeautoms: bool,  /* write automorphisms? */
-    writemarkers: bool, /* write stats on pts fixed, etc.? */
-    defaultptn: bool,   /* set lab,ptn,active for single cell? */
-    cartesian: bool,    /* use cartesian rep for writing automs? */
-    linelength: u8,     /* max chars/line (excl. '\n') for output */
-    outfile: File,      /* file for output, if any */
-    tc_level: usize,    /* max level for smart target cell choosing */
-    mininvarlevel: u8,  /* min level for invariant computation */
-    maxinvarlevel: u8,  /* max level for invariant computation */
-    invararg: u8,       /* value passed to (*invarproc)() */
-    schreier: bool,     /* use random schreier method */  // skip for now
+    getcanon: u8,              /* make canong and canonlab? */
+    digraph: bool,             /* multiple edges or loops? */
+    writeautoms: bool,         /* write automorphisms? */
+    writemarkers: bool,        /* write stats on pts fixed, etc.? */
+    defaultptn: bool,          /* set lab,ptn,active for single cell? */
+    cartesian: bool,           /* use cartesian rep for writing automs? */
+    linelength: Option<usize>, /* max chars/line (excl. '\n') for output */
+    outfile: RefCell<File>,    /* file for output, if any */
+    tc_level: usize,           /* max level for smart target cell choosing */
+    mininvarlevel: u8,         /* min level for invariant computation */
+    maxinvarlevel: u8,         /* max level for invariant computation */
+    invararg: u8,              /* value passed to (*invarproc)() */
+    schreier: bool,            /* use random schreier method */  // skip for now
 }
 
 struct StatBlk {
@@ -378,6 +381,7 @@ impl VecMap {
 // static variables in nauty.c
 #[derive(Default)]
 pub struct NautyEnv {
+    pub labelorg: usize,
     /* temporary versions of some stats: */
     pub invapplics: usize,
     pub invsuccesses: usize,
@@ -956,7 +960,13 @@ fn processnode(
             ) = fmperm(&workperm);
             nauty_env.fmptr_index += 2;
             if options.writeautoms {
-                //writeperm(...);
+                writeperm(
+                    options.outfile.borrow_mut().by_ref(),
+                    &workperm,
+                    options.cartesian,
+                    options.linelength,
+                    nauty_env,
+                );
             }
             nauty_env.gca_first
         }
