@@ -19,6 +19,10 @@ impl<'a> Cell<'a> {
         self.cell_lab.len()
     }
 
+    pub fn is_discrete(&self) -> bool {
+        self.len() == 1
+    }
+
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.cell_lab.is_empty()
@@ -46,6 +50,10 @@ impl<'a> Cell<'a> {
             cell_set.add_one(*i);
         }
         cell_set
+    }
+
+    pub fn lmin(&self) -> Option<usize> {
+        self.iter().min().copied()
     }
 }
 

@@ -264,22 +264,12 @@ impl Partition {
         let mut fix = Set::zeros(self.len());
         let mut mcr = Set::zeros(self.len());
 
-        for mut i in 0..self.len() {
-            if self.nest.ptn[i] <= self.level {
-                fix.set(self[i], true);
-                mcr.set(self[i], true);
+        for cell in self.cells() {
+            if cell.is_discrete() {
+                fix.set(cell[0], true);
+                mcr.set(cell[0], true);
             } else {
-                let mut lmin = self.nest.lab[i];
-                loop {
-                    i += 1;
-                    if self.nest.lab[i] < lmin {
-                        lmin = self.nest.lab[i];
-                    }
-                    if self.nest.ptn[i] <= self.level {
-                        break;
-                    }
-                    mcr.set(lmin, true);
-                }
+                mcr.set(cell.lmin().expect("lmin"), true);
             }
         }
         (fix, mcr)
