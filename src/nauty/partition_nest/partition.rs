@@ -1,9 +1,9 @@
 use super::PartitionNest;
 use super::partition_nest_chunk_by::PartitionNestChunkBy;
-use crate::nauty::graph;
 use crate::nauty::partition_nest::partition::cell::Cell;
 use crate::nauty::partition_nest::partition::cell_mut::CellMut;
 use crate::nauty::{Set, graph::Graph};
+use crate::nauty::{SetTrait, graph};
 use bitvec::bitvec;
 use bitvec::order::Msb0;
 use std::mem::{replace, swap, take};
@@ -247,6 +247,42 @@ impl Partition {
             perm[other[i]] = self[i];
         }
         perm
+    }
+
+    /*****************************************************************************
+     *                                                                            *
+     *  fmptn(lab,ptn,level,fix,mcr,m,n) uses the partition at the specified      *
+     *  level in the partition nest (lab,ptn) to make sets fix and mcr.  fix      *
+     *  represents the points in trivial cells of the partition, while mcr        *
+     *  represents those points which are least in their cells.                   *
+     *                                                                            *
+     *  GLOBALS ACCESSED: bit<r>                                                  *
+     *                                                                            *
+     *****************************************************************************/
+    //nautil.c 425
+    pub fn fmptn(&self) -> (Set, Set) {
+        let mut fix = Set::zeros(self.len());
+        let mut mcr = Set::zeros(self.len());
+
+        for mut i in 0..self.len() {
+            if self.nest.ptn[i] <= self.level {
+                fix.set(self[i], true);
+                mcr.set(self[i], true);
+            } else {
+                let mut lmin = self.nest.lab[i];
+                loop {
+                    i += 1;
+                    if self.nest.lab[i] < lmin {
+                        lmin = self.nest.lab[i];
+                    }
+                    if self.nest.ptn[i] <= self.level {
+                        break;
+                    }
+                    mcr.set(lmin, true);
+                }
+            }
+        }
+        (fix, mcr)
     }
 }
 
