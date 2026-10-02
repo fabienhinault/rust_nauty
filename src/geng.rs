@@ -4,6 +4,9 @@ use crate::{
     nauty::{NautyCounter, graph},
 };
 
+fn xnextbit(i: usize) -> usize {
+    i.leading_zeros() as usize
+}
 pub struct Extender {
     pub maxn: usize,
     pub mindeg: usize,
@@ -15,6 +18,7 @@ pub struct Extender {
 
 impl Extender {
     /* extend from n to n+1 -- version for general graphs */
+    // 2314
     pub fn genextend(
         &mut self,
         g: &mut graph::Graph,
@@ -110,4 +114,73 @@ fn accept2(
 #[inline(always)]
 fn xbit(i: usize) -> usize {
     1 << i
+}
+
+/* form orbits on powerset of VG
+called by nauty;  operates on data[n] */
+// 1190
+fn userautomproc(
+    count: usize,
+    p: &[usize],
+    orbits: &[usize],
+    numorbits: usize,
+    stabvertex: usize,
+    n: usize,
+    data: &mut LevelData,
+) {
+    // let xorb = &mut data.xorb;
+    // let xset = |i| data.xset(i);
+    // let xinv = &mut data.xinv;
+    let LevelData {
+        xorb,
+        x_set_card,
+        xinv,
+        ..
+    } = data;
+    let xset = |i: usize| x_set_card[i].set;
+    let lo = data.lo;
+    let hi = data.hi;
+
+    if count == 1 {
+        for i in lo..hi {
+            xorb[i] = i;
+        }
+    }
+    let mut moved = 0;
+    for i in 0..n {
+        if p[i] != i {
+            moved |= 1 << i;
+        }
+    }
+    for i in lo..hi {
+        let mut w = xset(i);
+        if w & moved == 0 {
+            continue;
+        }
+        let mut pxi = xset(i) & !moved;
+        while w != 0 {
+            let j1 = xnextbit(w);
+            w ^= 1 << j1;
+            pxi |= 1 << p[j1];
+        }
+        let pi = xinv[pxi].expect("xinv[pxi]");
+        let mut j1 = xorb[i];
+        while xorb[j1] != j1 {
+            j1 = xorb[j1];
+        }
+        let mut j2 = xorb[pi];
+        while xorb[j2] != j2 {
+            j2 = xorb[j2];
+        }
+
+        if j1 < j2 {
+            xorb[pi] = j1;
+            xorb[i] = j1;
+            xorb[j2] = j1;
+        } else if j1 > j2 {
+            xorb[pi] = j2;
+            xorb[i] = j2;
+            xorb[j1] = j2;
+        }
+    }
 }

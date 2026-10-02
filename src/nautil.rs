@@ -38,6 +38,48 @@ impl SetWordNautilTrait for Set {
     }
 }
 
+/*****************************************************************************
+*                                                                            *
+*  orbits represents a partition of {0,1,...,n-1}, by orbits[i] = the        *
+*  smallest element in the same cell as i.  map[] is any array with values   *
+*  in {0,1,...,n-1}.  orbjoin(orbits,map,n) joins the cells of orbits[]      *
+*  together to the minimum extent such that for each i, i and map[i] are in  *
+*  the same cell.  The function value returned is the new number of cells.   *
+*                                                                            *
+*  GLOBALS ACCESSED: NONE                                                    *
+*                                                                            *
+*****************************************************************************/
+// 266
+pub fn orbjoin(orbits: &mut [usize], map: &[usize]) -> usize {
+    let mut j1;
+    let mut j2;
+    for i in 0..orbits.len() {
+        if map[i] != i {
+            j1 = orbits[i];
+            while orbits[j1] != j1 {
+                j1 = orbits[j1];
+            }
+            j2 = orbits[map[i]];
+            while orbits[j2] != j2 {
+                j2 = orbits[j2];
+            }
+            if j1 < j2 {
+                orbits[j2] = j1;
+            } else if j1 > j2 {
+                orbits[j1] = j2;
+            }
+        }
+    }
+    for i in 0..orbits.len() {
+        orbits[i] = orbits[orbits[i]];
+    }
+    orbits
+        .iter()
+        .enumerate()
+        .filter(|(i, orbit)| *orbit == i)
+        .count()
+}
+
 fn condnl(
     x: usize,
     curlen: &mut usize,

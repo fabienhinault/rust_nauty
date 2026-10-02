@@ -7,9 +7,9 @@ const MAXN: usize = WORD_SIZE;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 pub struct SetCard {
-    card: usize, /* cardinalities of all x-sets */
+    pub card: usize, /* cardinalities of all x-sets */
     //set: BitVec<usize, Msb0>, /* array of all x-sets in card order */
-    set: usize,
+    pub set: usize,
 }
 #[derive(Default)]
 pub struct LevelData {
@@ -20,15 +20,15 @@ pub struct LevelData {
     pub xlb: usize,
     // extension degree upper bound
     pub xub: usize,
-    lo: usize, /* work purposes for orbit calculation */
-    hi: usize,
+    pub lo: usize, /* work purposes for orbit calculation */
+    pub hi: usize,
     pub xstart: [usize; MAXN + 1], /* index into xset[] for each cardinality */
     // xset: Vec<SetWord>,
     // xcard: Vec<SetWord>,
-    x_set_card: Vec<SetCard>, /* array of all x-sets in card order, cardinalities of all x-sets */
-    xinv: Vec<Option<usize>>, /* map from x-set to index in xset */
-    pub xorb: Vec<usize>,     /* min orbit representative */
-    xx: Vec<usize>,           /* (-b, -t, -s, -m) candidate x-sets */
+    pub x_set_card: Vec<SetCard>, /* array of all x-sets in card order, cardinalities of all x-sets */
+    pub xinv: Vec<Option<usize>>, /* map from x-set to index in xset */
+    pub xorb: Vec<usize>,         /* min orbit representative */
+    xx: Vec<usize>,               /* (-b, -t, -s, -m) candidate x-sets */
     /*   note: can be the same as xcard */
     xlim: usize, /* number of x-sets in xx[] */
 }

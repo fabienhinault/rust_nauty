@@ -46,8 +46,9 @@ use crate::{
         g6error::G6Error,
         g6string::{G6String, graph_size},
     },
+    level_data::LevelData,
     naugraph::isautom,
-    nautil::{doref_nest, fmperm, maketargetcell, maketargetcell_mut, writeperm},
+    nautil::{doref_nest, fmperm, maketargetcell, maketargetcell_mut, orbjoin, writeperm},
     nauty::partition_nest::{
         PartitionNest,
         partition::{Partition, cell::Cell},
@@ -62,6 +63,7 @@ use std::{
     mem,
     ops::{Index, IndexMut},
     rc::Rc,
+    todo,
 };
 
 pub mod partition_nest;
@@ -77,11 +79,30 @@ struct OptionBlk {
     cartesian: bool,           /* use cartesian rep for writing automs? */
     linelength: Option<usize>, /* max chars/line (excl. '\n') for output */
     outfile: RefCell<File>,    /* file for output, if any */
+    /* procedure called for each automorphism */
+    userautomproc: Option<Box<dyn Fn(usize, &[usize], &[usize], usize, usize, usize) -> ()>>,
+    usercanonproc: Option<()>, /* procedure called for better labellings */
     tc_level: usize,           /* max level for smart target cell choosing */
     mininvarlevel: u8,         /* min level for invariant computation */
     maxinvarlevel: u8,         /* max level for invariant computation */
     invararg: u8,              /* value passed to (*invarproc)() */
     schreier: bool,            /* use random schreier method */  // skip for now
+}
+
+impl OptionBlk {
+    fn userautomproc(
+        &self,
+        count: usize,
+        p: &[usize],
+        orbits: &[usize],
+        numorbits: usize,
+        stabvertex: usize,
+        n: usize,
+    ) {
+        self.userautomproc
+            .as_ref()
+            .map(|f| f(count, p, orbits, numorbits, stabvertex, n));
+    }
 }
 
 struct StatBlk {
@@ -382,6 +403,8 @@ impl VecMap {
 #[derive(Default)]
 pub struct NautyEnv {
     pub labelorg: usize,
+    /* local versions of some of the arguments: */
+    pub orbits: Vec<usize>,
     /* temporary versions of some stats: */
     pub invapplics: usize,
     pub invsuccesses: usize,
@@ -540,10 +563,10 @@ fn nauty(
         &mut stats,
         options.tc_level,
         &mut firsttc,
-        orbits_arg,
         &mut nauty_env,
         &options,
     );
+    *orbits_arg = nauty_env.orbits.clone();
     Ok(())
 }
 
@@ -637,7 +660,6 @@ fn firstpathnode_nest(
     stats: &mut StatBlk,
     tc_level: usize,
     firsttc: &mut VecMap,
-    orbits_arg: &mut Vec<usize>,
     nauty_env: &mut NautyEnv,
     options: &OptionBlk,
 ) -> usize {
@@ -690,15 +712,15 @@ fn firstpathnode_nest(
     let tv1 = tcell[0];
     let tc = tcell.first_lab_index;
     for (i, tv) in cell_lab.iter().copied().enumerate() {
-        if orbits_arg[tv] == tv {
+        if nauty_env.orbits[tv] == tv {
             partition.breakout(tc, tv);
             nauty_env.fixedpts.add_one(tv);
             nauty_env.cosetindex = tv;
             if tv == tv1 {
                 partition.advance();
                 rtnlevel = firstpathnode_nest(
-                    g_arg, partition, active, firstcode, stats, tc_level, firsttc, orbits_arg,
-                    nauty_env, options,
+                    g_arg, partition, active, firstcode, stats, tc_level, firsttc, nauty_env,
+                    options,
                 );
                 _childcount = 1;
                 nauty_env.gca_first = level;
@@ -741,7 +763,6 @@ fn othernode(
     stats: &mut StatBlk,
     tc_level: usize,
     firsttc: &mut VecMap,
-    orbits_arg: &mut Vec<usize>,
     nauty_env: &mut NautyEnv,
     options: &OptionBlk,
 ) -> usize {
@@ -907,6 +928,7 @@ fn processnode(
     let mut canong;
     let mut code: ProcessNodeCode = ProcessNodeCode::Zero;
     let mut newlevel: usize = 0;
+    let mut sr = 0;
 
     if nauty_env.eqlev_first != partition.level
         && (options.getcanon == 0 || nauty_env.comp_canon < 0)
@@ -919,38 +941,40 @@ fn processnode(
                 code = ProcessNodeCode::One(workperm);
             }
         }
-    }
-    if code == ProcessNodeCode::Zero {
-        if options.getcanon != 0 {
-            let mut sr = 0;
-            if nauty_env.comp_canon == 0 {
-                if partition.level < nauty_env.canonlevel {
-                    nauty_env.comp_canon = 1;
+
+        if code == ProcessNodeCode::Zero {
+            if options.getcanon != 0 {
+                if nauty_env.comp_canon == 0 {
+                    if partition.level < nauty_env.canonlevel {
+                        nauty_env.comp_canon = 1;
+                    } else {
+                        canong = g.updatecan(&nauty_env.canon_partition, nauty_env.samerows);
+                        nauty_env.samerows = g.n();
+                        nauty_env.comp_canon = g.testcanlab(&canong, partition, &mut sr)
+                    }
+                }
+                if nauty_env.comp_canon == 0 {
+                    code = ProcessNodeCode::Two(partition.permutation2(&nauty_env.canon_partition));
+                } else if nauty_env.comp_canon > 0 {
+                    code = ProcessNodeCode::Three
                 } else {
-                    canong = g.updatecan(&nauty_env.canon_partition, nauty_env.samerows);
-                    nauty_env.samerows = g.n();
-                    nauty_env.comp_canon = g.testcanlab(&canong, partition, &mut nauty_env.samerows)
+                    code = ProcessNodeCode::Four;
                 }
             }
-            if nauty_env.comp_canon == 0 {
-                code = ProcessNodeCode::Two(partition.permutation2(&nauty_env.canon_partition));
-            } else if nauty_env.comp_canon > 0 {
-                code = ProcessNodeCode::Three
-            } else {
-                code = ProcessNodeCode::Four;
-            }
+        }
+
+        if code != ProcessNodeCode::Zero && partition.level > stats.maxlevel {
+            stats.maxlevel = partition.level
         }
     }
 
-    if code != ProcessNodeCode::Zero && partition.level > stats.maxlevel {
-        stats.maxlevel = partition.level
-    }
-
     match code {
-        /* nothing unusual noticed */
-        ProcessNodeCode::Zero => partition.level,
-        /* lab is equivalent to firstlab */
+        ProcessNodeCode::Zero => {
+            /* nothing unusual noticed */
+            return partition.level;
+        }
         ProcessNodeCode::One(workperm) => {
+            /* lab is equivalent to firstlab */
             if nauty_env.fmptr_index == nauty_env.workspace.len() {
                 nauty_env.fmptr_index -= 2;
             }
@@ -968,10 +992,123 @@ fn processnode(
                     nauty_env,
                 );
             }
-            nauty_env.gca_first
+            stats.numorbits = orbjoin(&mut nauty_env.orbits, &workperm);
+            stats.numgenerators += 1;
+            if let Some(userautomproc) = options.userautomproc.as_ref() {
+                userautomproc(
+                    stats.numgenerators,
+                    &workperm,
+                    &nauty_env.orbits,
+                    stats.numorbits,
+                    nauty_env.stabvertex,
+                    g.n(),
+                )
+            }
+            if options.schreier {
+                todo!("addgenerator(&gp,&gens,workperm,n)");
+            }
+            if nauty_env.orbits[nauty_env.cosetindex] < nauty_env.cosetindex {
+                return nauty_env.gca_first;
+            }
+            if nauty_env.gca_canon != nauty_env.gca_first {
+                nauty_env.needshortprune = true;
+            }
+            return nauty_env.gca_canon;
         }
-        ProcessNodeCode::Two(items) => todo!(),
-        ProcessNodeCode::Three => todo!(),
-        ProcessNodeCode::Four => todo!(),
+        ProcessNodeCode::Two(workperm) => {
+            /* lab is equivalent to canonlab */
+            if nauty_env.fmptr_index == nauty_env.workspace.len() {
+                nauty_env.fmptr_index -= 2;
+            }
+            (
+                nauty_env.workspace[nauty_env.fmptr_index],
+                nauty_env.workspace[nauty_env.fmptr_index + 1],
+            ) = fmperm(&workperm);
+            let save = stats.numorbits;
+            stats.numorbits = orbjoin(&mut nauty_env.orbits, &workperm);
+            if stats.numorbits == save {
+                if nauty_env.gca_canon != nauty_env.gca_first {
+                    nauty_env.needshortprune = true;
+                }
+                return nauty_env.gca_canon;
+            }
+            if options.writeautoms {
+                writeperm(
+                    options.outfile.borrow_mut().by_ref(),
+                    &workperm,
+                    options.cartesian,
+                    options.linelength,
+                    nauty_env,
+                );
+            }
+            stats.numgenerators += 1;
+            if let Some(userautomproc) = options.userautomproc.as_ref() {
+                userautomproc(
+                    stats.numgenerators,
+                    &workperm,
+                    &nauty_env.orbits,
+                    stats.numorbits,
+                    nauty_env.stabvertex,
+                    g.n(),
+                )
+            }
+            if options.schreier {
+                todo!("addgenerator(&gp,&gens,workperm,n)");
+            }
+            if nauty_env.orbits[nauty_env.cosetindex] < nauty_env.cosetindex {
+                return nauty_env.gca_first;
+            }
+            if nauty_env.gca_canon != nauty_env.gca_first {
+                nauty_env.needshortprune = true;
+            }
+            return nauty_env.gca_canon;
+        }
+        ProcessNodeCode::Three => {
+            /* lab is better than canonlab */
+            stats.canupdates += 1;
+            nauty_env.canon_partition = partition.clone();
+            nauty_env.gca_canon = partition.level;
+            nauty_env.eqlev_canon = partition.level as isize;
+            nauty_env.canonlevel = partition.level;
+            nauty_env.comp_canon = 0;
+            nauty_env.canoncode[partition.level + 1] = 0o77777;
+            nauty_env.samerows = sr;
+            if options.getcanon != 0 && options.usercanonproc.is_some() {
+                todo!();
+            }
+        }
+        ProcessNodeCode::Four => {
+            /* non-automorphism terminal node */
+            stats.numbadleaves += 1;
+        }
     }
+    /* only cases 3 and 4 get this far: */
+    let ispruneok;
+    if partition.level != nauty_env.noncheaplevel {
+        ispruneok = true;
+        if nauty_env.fmptr_index == nauty_env.workspace.len() {
+            nauty_env.fmptr_index -= 2;
+        }
+        (
+            nauty_env.workspace[nauty_env.fmptr_index],
+            nauty_env.workspace[nauty_env.fmptr_index + 1],
+        ) = partition.fmptn();
+        nauty_env.fmptr_index += 2;
+    } else {
+        ispruneok = false;
+    }
+    let save = if nauty_env.allsamelevel as isize > nauty_env.eqlev_canon {
+        nauty_env.allsamelevel - 1
+    } else {
+        nauty_env.eqlev_canon as usize
+    };
+    let newlevel = if nauty_env.noncheaplevel <= save {
+        nauty_env.allsamelevel - 1
+    } else {
+        save
+    };
+    if ispruneok && newlevel != nauty_env.gca_first {
+        nauty_env.needshortprune = true;
+    }
+    newlevel
 }
