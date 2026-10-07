@@ -79,8 +79,10 @@ struct OptionBlk {
     cartesian: bool,           /* use cartesian rep for writing automs? */
     linelength: Option<usize>, /* max chars/line (excl. '\n') for output */
     outfile: RefCell<File>,    /* file for output, if any */
+    usernodeproc: Option<()>,
     /* procedure called for each automorphism */
     userautomproc: Option<Box<dyn Fn(usize, &[usize], &[usize], usize, usize, usize) -> ()>>,
+    userlevelproc: Option<()>, /* procedure called for each level */
     usercanonproc: Option<()>, /* procedure called for better labellings */
     tc_level: usize,           /* max level for smart target cell choosing */
     mininvarlevel: u8,         /* min level for invariant computation */
@@ -106,8 +108,8 @@ impl OptionBlk {
 }
 
 struct StatBlk {
-    grpsize1: f64,        /* size of group is */
-    grpsize2: i64,        /*    grpsize1 * 10^grpsize2 */
+    grpsize1: f64, /* size of group is grpsize1 * 10^grpsize2 */
+    grpsize2: i64,
     numorbits: usize,     /* number of orbits in group */
     numgenerators: usize, /* number of generators found */
     errstatus: u8,        /* if non-zero : an error code */
@@ -126,6 +128,14 @@ impl StatBlk {
         Self {
             numorbits,
             ..Default::default()
+        }
+    }
+
+    fn multiply_grpsize(&mut self, i: f64) {
+        self.grpsize1 *= i;
+        if self.grpsize1 > 1.0e10 {
+            self.grpsize1 /= 1.0e10;
+            self.grpsize2 = 10;
         }
     }
 }
@@ -161,11 +171,11 @@ pub type Set = BitVec<usize, Msb0>;
 pub mod graph;
 pub type NautyCounter = u128;
 
-pub trait SetTrait {
+pub trait SetTrait: Sized {
     fn difference(&self, other: &Self) -> Self;
     fn first_bit_nz_index(&self) -> usize;
     fn zeros(n: usize) -> Self;
-    fn one(index: usize) -> Self;
+    fn one(n: usize, index: usize) -> Self;
     fn add_one(&mut self, index: usize);
     fn remove_one(&mut self, index: usize);
     fn except_one(&self, index: usize) -> Self;
@@ -177,6 +187,8 @@ pub trait SetTrait {
     fn permset(&self, perm: &[usize]) -> Self;
     fn takebit(&mut self) -> usize;
     fn is_zero(&self) -> bool;
+    fn shortprune(&mut self, set2: &Self);
+    fn longprune(self, fix: &Self, fms: &[Self]) -> Self;
 }
 
 impl SetTrait for Set {
@@ -185,15 +197,17 @@ impl SetTrait for Set {
     }
 
     fn add_one(&mut self, index: usize) {
-        *self |= Self::one(index);
+        self.set(index, true);
     }
 
     fn remove_one(&mut self, index: usize) {
-        *self &= !Self::one(index);
+        self.set(index, false);
     }
 
     fn except_one(&self, index: usize) -> Self {
-        self.difference(&Self::one(index))
+        let mut s = self.clone();
+        s.set(index, false);
+        s
     }
 
     fn first_bit_nz_index(&self) -> usize {
@@ -204,8 +218,10 @@ impl SetTrait for Set {
         bitvec![usize, Msb0; 0; n]
     }
 
-    fn one(index: usize) -> Self {
-        Self::from_element(BIT[index])
+    fn one(n: usize, index: usize) -> Self {
+        let mut s = Self::zeros(n);
+        s.set(index, true);
+        s
     }
 
     fn filter(&self, other: &Self) -> Self {
@@ -260,6 +276,33 @@ impl SetTrait for Set {
 
     fn is_zero(&self) -> bool {
         self.first_one().is_none()
+    }
+
+    fn shortprune(&mut self, set2: &Self) {
+        *self = self.clone() & set2;
+    }
+
+    /*****************************************************************************
+     *                                                                            *
+     *  longprune(tcell,fix,bottom,top,m) removes zero or elements of the set     *
+     *  tcell.  It is assumed that addresses bottom through top-1 contain         *
+     *  contiguous pairs of sets (f1,m1),(f2,m2), ... .  tcell is intersected     *
+     *  with each mi such that fi is a subset of fix.                             *
+     *                                                                            *
+     *  GLOBALS ACCESSED: NONE                                                    *
+     *                                                                            *
+     *****************************************************************************/
+    // nautil.c 647
+
+    fn longprune(mut self, fix: &Self, fms: &[Self]) -> Self {
+        for fm in fms.chunks_exact(2) {
+            if let [f, m] = fm {
+                if (fix.clone() & (!f.clone())).any() {
+                    self &= m;
+                }
+            }
+        }
+        self
     }
 }
 
@@ -443,6 +486,24 @@ impl NautyEnv {
             ..Default::default()
         }
     }
+
+    fn recover(&mut self, getcanon: u8, level: usize) {
+        if level < self.noncheaplevel {
+            self.noncheaplevel = level + 1;
+        }
+        if level < self.eqlev_first {
+            self.eqlev_first = level;
+        }
+        if getcanon != 0 {
+            if level < self.gca_canon {
+                self.gca_canon = level;
+            }
+            if level as isize <= self.eqlev_canon {
+                self.eqlev_canon = level as isize;
+                self.comp_canon = 0;
+            }
+        }
+    }
 }
 /*****************************************************************************
 *                                                                            *
@@ -489,20 +550,16 @@ impl NautyEnv {
 *****************************************************************************/
 fn nauty(
     g_arg: graph::Graph,
-    lab: &mut [usize],
-    ptn: &mut [usize],
-    active_arg: &Set,
+    mut nest: PartitionNest,
+    active_arg: Option<&Set>,
     orbits_arg: &mut Vec<usize>,
     options: &OptionBlk,
     _stats_arg: &mut StatBlk,
-    _canong_arg: &mut graph::Graph,
+    canong_arg: &mut graph::Graph,
 ) -> Result<(), u8> {
     let n = g_arg.n();
     let mut nauty_env = NautyEnv::new(n);
-
-    let mut numcells: usize;
     let mut _initstatus: u8;
-
     let _defltwork: Vec<Set>;
     let mut firstcode: Vec<usize> = vec![0; n + 2];
     let _canoncode: Vec<u8>;
@@ -510,41 +567,25 @@ fn nauty(
     let mut active: Set;
 
     /* initialize everything: */
-    active = Set::one(0);
+    active = Set::one(n, 0);
     if options.defaultptn {
-        for i in 0..n {
-            lab[i] = i;
-            ptn[i] = NAUTY_INFINITY;
-        }
-        ptn[n - 1] = 0;
-        active = Set::one(0);
-        numcells = 1;
+        nest = PartitionNest::default_n(n);
     } else {
-        ptn[n - 1] = 0;
-        numcells = 0;
-        for i in 0..n {
-            if ptn[i] != 0 {
-                ptn[i] = NAUTY_INFINITY;
-            } else {
-                numcells += 1;
-            }
-            if active_arg.is_empty() {
-                active = Set::zeros(n);
-                for mut i in 0..n {
-                    active.add_one(i);
-                    while ptn[i] != 0 {
-                        i += 1;
-                    }
-                }
-            } else {
+        nest.set_to_infinity();
+        match active_arg {
+            Some(active_arg) => {
                 active = active_arg.clone();
+            }
+            None => {
+                active = nest.to_active_set();
             }
         }
     }
-    let mut g: graph::Graph;
-    let mut cannong: graph::Graph;
     _initstatus = 0;
-
+    // OPTCALL(dispatch.init)
+    if options.schreier {
+        todo!();
+    }
     *orbits_arg = (0..n).collect();
     let mut stats: StatBlk = StatBlk::new(n);
     nauty_env.fixedpts = Set::zeros(n);
@@ -554,7 +595,7 @@ fn nauty(
     nauty_env.invarsuclevel = NAUTY_INFINITY;
     nauty_env.invapplics = 0;
     nauty_env.invsuccesses = 0;
-    let mut partition = Partition::new(PartitionNest::new(lab.to_vec(), ptn.to_vec()), 1);
+    let mut partition = Partition::new(nest, 1);
     firstpathnode_nest(
         &g_arg,
         &mut partition,
@@ -564,73 +605,36 @@ fn nauty(
         options.tc_level,
         &mut firsttc,
         &mut nauty_env,
-        &options,
-    );
+        options,
+        canong_arg,
+    )
+    .map_err(err_nauty_to_nau)?;
+
+    if options.getcanon != 0 {
+        *canong_arg = g_arg.updatecan(&nauty_env.canon_partition, nauty_env.samerows);
+    }
+    stats.invarsuclevel = if nauty_env.invarsuclevel == NAUTY_INFINITY {
+        0
+    } else {
+        nauty_env.invarsuclevel
+    };
+    stats.invapplics = nauty_env.invapplics;
+    stats.invsuccesses = nauty_env.invsuccesses;
+    if options.schreier {
+        todo!();
+    }
     *orbits_arg = nauty_env.orbits.clone();
     Ok(())
 }
 
-/*****************************************************************************
-*                                                                            *
-*  firstpathnode(lab,ptn,level,numcells) produces a node on the leftmost     *
-*  path down the tree.  The parameters describe the level and the current    *
-*  colour partition.  The set of active cells is taken from the global set   *
-*  'active'.  If the refined partition is not discrete, the leftmost child   *
-*  is produced by calling firstpathnode, and the other children by calling   *
-*  othernode.                                                                *
-*  For MAXN=0 there is an extra parameter: the address of the parent tcell   *
-*  structure.                                                                *
-*  The value returned is the level to return to.                             *
-*                                                                            *
-*  FUNCTIONS CALLED: (*usernodeproc)(),doref(),cheapautom(),                 *
-*                    firstterminal(),nextelement(),breakout(),               *
-*                    firstpathnode(),othernode(),recover(),writestats(),     *
-*                    (*userlevelproc)(),(*tcellproc)(),shortprune()          *
-*                                                                            *
-*****************************************************************************/
-fn firstpathnode(
-    _g_arg: graph::Graph,
-    _lab: &mut [usize],
-    _ptn: &mut [usize],
-    _level: usize,
-    _numcells: usize,
-    stats: &mut StatBlk,
-    _firsttc: &mut VecMap,
-) -> Result<(), u8> {
-    let _tv: usize;
-    let _tv1: usize;
-    let _index: usize;
-    let _rtnlevel: usize;
-    let _tcellsize: usize;
-    let _tc: usize;
-    let _childcount: usize;
-    let _qinvar: usize;
-    let _refcode: usize;
-    let mut _tcell: &mut Set;
-
-    stats.numnodes += 1;
-
-    /* refine partition : */
-    // doref(
-    //     g_arg,
-    //     lab,
-    //     ptn,
-    //     level,
-    //     &numcells,
-    //     &qinvar,
-    //     workperm,
-    //     active,
-    //     &refcode,
-    //     dispatch.refine,
-    //     invarproc,
-    //     mininvarlevel,
-    //     maxinvarlevel,
-    //     invararg,
-    //     digraph,
-    //     M,
-    //     n,
-    // );
-    Ok(())
+fn err_nauty_to_nau(nauty_err: i8) -> u8 {
+    const NAUTY_ABORTED: i8 = -11;
+    const NAUTY_KILLED: i8 = -12;
+    match nauty_err {
+        NAUTY_ABORTED => 4,
+        NAUTY_KILLED => 5,
+        _ => 0,
+    }
 }
 
 /*****************************************************************************
@@ -653,7 +657,7 @@ fn firstpathnode(
 *****************************************************************************/
 // 561
 fn firstpathnode_nest(
-    mut g_arg: &graph::Graph,
+    g_arg: &graph::Graph,
     partition: &mut Partition,
     mut active: &mut Set,
     firstcode: &mut Vec<usize>,
@@ -662,56 +666,66 @@ fn firstpathnode_nest(
     firsttc: &mut VecMap,
     nauty_env: &mut NautyEnv,
     options: &OptionBlk,
-) -> usize {
-    let _index: usize;
-    let mut rtnlevel: usize = 0;
+    canong_arg: &mut graph::Graph,
+) -> Result<usize, i8> {
+    let n = g_arg.n();
+    let mut rtnlevel: usize;
     let _childcount: usize;
     let mut qinvar: usize = 0;
     let mut refcode: usize = 0;
-    let mut partition = partition;
     let level = partition.level;
-    let cheapautom = partition.cheapautom();
+    let mut tcel: Option<Cell> = None;
+    let mut tcell: Set = Set::zeros(n);
 
     stats.numnodes += 1;
 
     /* refine partition : */
-    doref_nest(
-        g_arg,
-        &mut partition,
-        &mut qinvar,
-        &mut active,
-        &mut refcode,
-    );
+    doref_nest(g_arg, partition, &mut qinvar, &mut active, &mut refcode);
     firstcode[partition.level] = refcode;
     if qinvar > 0 {
         todo!("qinvar always == 0");
     }
     if !partition.is_discrete() {
-        let tcell = maketargetcell(&g_arg, &mut partition, tc_level, None);
-        stats.tctotal += tcell.len();
-        nauty_env.firsttc[level] = tcell.first_lab_index as isize;
+        let loc_tcel = maketargetcell(&g_arg, partition, tc_level, None);
+        stats.tctotal += loc_tcel.len();
+        nauty_env.firsttc[level] = loc_tcel.first_lab_index as isize;
+        tcell = loc_tcel.to_set(n);
+        tcel = Some(loc_tcel);
     } else {
         nauty_env.firsttc[level] = -1;
     }
     if partition.is_discrete() {
-        firstterminal(&mut partition, stats, nauty_env, options.getcanon);
+        firstterminal(partition, stats, nauty_env, options.getcanon);
+        if let Some(_userlevelproc) = options.userlevelproc {
+            todo!();
+        }
+        if let Some(_usercanonproc) = options.usercanonproc
+            && options.getcanon != 0
+        {
+            *canong_arg = g_arg.updatecan(&nauty_env.canon_partition, nauty_env.samerows);
+            nauty_env.samerows = n;
+            todo!();
+        }
         return partition.level - 1;
     }
-
-    let tcell = maketargetcell(&g_arg, &mut partition, tc_level, None);
-    stats.tctotal += tcell.len();
-    firsttc.set(level, tcell.first_lab_index);
-    if nauty_env.noncheaplevel >= level && !cheapautom {
-        nauty_env.noncheaplevel += 1;
+    if nauty_env.noncheaplevel > partition.level && partition.cheapautom() {
+        nauty_env.noncheaplevel = partition.level + 1;
     }
-
+    /*
+        let tcell = maketargetcell(g_arg, &partition, tc_level, None);
+        stats.tctotal += tcell.len();
+        firsttc.set(level, tcell.first_lab_index);
+        if nauty_env.noncheaplevel >= level && !cheapautom {
+            nauty_env.noncheaplevel += 1;
+        }
+    */
     /* use the elements of the target cell to produce the children: */
-    let mut _index = 0;
+    let mut index = 0;
     let mut _childcount = 0;
-    let cell_lab = tcell.to_vec();
-    let tv1 = tcell[0];
-    let tc = tcell.first_lab_index;
-    for (i, tv) in cell_lab.iter().copied().enumerate() {
+    let cell_lab: Vec<usize> = tcel.as_ref().map(Cell::to_sorted_vec).unwrap_or(vec![]);
+    let tv1 = cell_lab[0];
+    let tc = cell_lab[0];
+    for tv in cell_lab.iter().copied() {
         if nauty_env.orbits[tv] == tv {
             partition.breakout(tc, tv);
             nauty_env.fixedpts.add_one(tv);
@@ -720,27 +734,42 @@ fn firstpathnode_nest(
                 partition.advance();
                 rtnlevel = firstpathnode_nest(
                     g_arg, partition, active, firstcode, stats, tc_level, firsttc, nauty_env,
-                    options,
+                    options, canong_arg,
                 );
                 _childcount = 1;
                 nauty_env.gca_first = level;
                 nauty_env.stabvertex = tv1;
             } else {
                 partition.advance();
-                //                rtnlevel = othernode(partition);
+                rtnlevel = othernode(
+                    g_arg, partition, active, stats, tc_level, firsttc, nauty_env, options,
+                    canong_arg,
+                );
                 _childcount += 1;
             }
             if rtnlevel < level {
                 return rtnlevel;
             }
             if nauty_env.needshortprune {
-                //                shortprune(cell_lab)
+                tcell.shortprune(&nauty_env.workspace[nauty_env.fmptr_index]);
             }
-            //            recover(partition.nest, level)
+            recover(partition, nauty_env, options.getcanon);
+        }
+        if nauty_env.orbits[tv] == tv1 {
+            index += 1
         }
     }
-
-    0
+    stats.multiply_grpsize(index as f64);
+    if cell_lab.len() == index && nauty_env.allsamelevel == partition.level + 1 {
+        nauty_env.allsamelevel -= 1;
+    }
+    if options.writemarkers {
+        todo!();
+    }
+    if let Some(_userlevelproc) = options.userlevelproc {
+        todo!();
+    }
+    partition.level - 1
 }
 
 /*****************************************************************************
@@ -757,7 +786,7 @@ fn firstpathnode_nest(
 *****************************************************************************/
 // 720
 fn othernode(
-    mut g_arg: &graph::Graph,
+    g_arg: &graph::Graph,
     partition: &mut Partition,
     mut active: &mut Set,
     stats: &mut StatBlk,
@@ -765,7 +794,9 @@ fn othernode(
     firsttc: &mut VecMap,
     nauty_env: &mut NautyEnv,
     options: &OptionBlk,
+    canong_arg: &mut graph::Graph,
 ) -> usize {
+    let n = g_arg.n();
     let _index: usize;
     let mut _rtnlevel: usize;
     let _childcount: usize;
@@ -816,23 +847,70 @@ fn othernode(
         }
     }
 
-    let tc: isize = -1;
+    let mut tc: Option<usize> = None;
+    let mut tcell = Set::zeros(n);
     if !partition.is_discrete()
         && (nauty_env.eqlev_first == level || (options.getcanon != 0 && nauty_env.comp_canon >= 0))
     {
-        let tcell;
+        let tcel;
         if options.getcanon == 0 || nauty_env.comp_canon < 0 {
-            tcell = maketargetcell(&g_arg, &mut partition, tc_level, Some(firsttc.get(level)));
-            if tc != firsttc.get(level) as isize {
+            tcel = maketargetcell(&g_arg, &mut partition, tc_level, Some(firsttc.get(level)));
+            tc = Some(tcel.first_lab_index);
+            if tcel.first_lab_index != firsttc.get(level) {
                 nauty_env.eqlev_first = level - 1;
             }
         } else {
-            tcell = maketargetcell(&g_arg, &mut partition, tc_level, None);
+            tcel = maketargetcell(&g_arg, &mut partition, tc_level, None);
         }
-        stats.tctotal += tcell.len();
+        stats.tctotal += tcel.len();
+        tcell = tcel.to_set(n);
+    }
+    if let Some(_usernodeproc) = options.usernodeproc {
+        todo!()
     }
 
-    0
+    /* call processnode to classify the type of this node: */
+    let mut rtnlevel = processnode(g_arg, partition, nauty_env, options, stats, canong_arg);
+    if rtnlevel < partition.level {
+        /* keep returning if necessary */
+        return rtnlevel;
+    }
+    if nauty_env.needshortprune {
+        nauty_env.needshortprune = false;
+        tcell.shortprune(&nauty_env.workspace[nauty_env.fmptr_index]);
+    }
+    if !partition.cheapautom() {
+        nauty_env.noncheaplevel = partition.level + 1;
+    }
+
+    /* use the elements of the target cell to produce the children: */
+    let tv1 = tcell.first_one();
+    for tv in tcell.ones_iter() {
+        partition.breakout(tc.unwrap(), tv);
+        nauty_env.fixedpts.set(tv, true);
+        rtnlevel = othernode(
+            g_arg, partition, active, stats, tc_level, firsttc, nauty_env, options, canong_arg,
+        );
+        nauty_env.fixedpts.set(tv, false);
+        if rtnlevel < partition.level {
+            return rtnlevel;
+        }
+        /* use stored automorphism data to prune target cell: */
+        if nauty_env.needshortprune {
+            nauty_env.needshortprune = false;
+            tcell.shortprune(&nauty_env.workspace[nauty_env.fmptr_index]);
+        }
+        if let Some(tv1) = tv1
+            && tv == tv1
+        {
+            tcell = tcell.longprune(
+                &nauty_env.fixedpts,
+                &nauty_env.workspace[..nauty_env.fmptr_index],
+            )
+        }
+        recover(partition, nauty_env, options.getcanon);
+    }
+    partition.level - 1
 }
 
 /*****************************************************************************
@@ -924,10 +1002,9 @@ fn processnode(
     nauty_env: &mut NautyEnv,
     options: &OptionBlk,
     stats: &mut StatBlk,
+    canong_arg: &mut graph::Graph,
 ) -> usize {
-    let mut canong;
     let mut code: ProcessNodeCode = ProcessNodeCode::Zero;
-    let mut newlevel: usize = 0;
     let mut sr = 0;
 
     if nauty_env.eqlev_first != partition.level
@@ -948,9 +1025,9 @@ fn processnode(
                     if partition.level < nauty_env.canonlevel {
                         nauty_env.comp_canon = 1;
                     } else {
-                        canong = g.updatecan(&nauty_env.canon_partition, nauty_env.samerows);
+                        *canong_arg = g.updatecan(&nauty_env.canon_partition, nauty_env.samerows);
                         nauty_env.samerows = g.n();
-                        nauty_env.comp_canon = g.testcanlab(&canong, partition, &mut sr)
+                        nauty_env.comp_canon = g.testcanlab(canong_arg, partition, &mut sr)
                     }
                 }
                 if nauty_env.comp_canon == 0 {
@@ -1111,4 +1188,18 @@ fn processnode(
         nauty_env.needshortprune = true;
     }
     newlevel
+}
+
+/*****************************************************************************
+*                                                                            *
+*  Recover the partition nest at level 'level' and update various other      *
+*  parameters.                                                               *
+*                                                                            *
+*  FUNCTIONS CALLED: NONE                                                    *
+*                                                                            *
+*****************************************************************************/
+// 1068
+fn recover(partition: &mut Partition, nauty_env: &mut NautyEnv, getcanon: u8) {
+    partition.recover();
+    nauty_env.recover(getcanon, partition.level);
 }

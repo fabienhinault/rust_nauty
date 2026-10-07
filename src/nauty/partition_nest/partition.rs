@@ -1,12 +1,12 @@
 use super::PartitionNest;
 use super::partition_nest_chunk_by::PartitionNestChunkBy;
+use crate::nauty::Set;
 use crate::nauty::partition_nest::partition::cell::Cell;
 use crate::nauty::partition_nest::partition::cell_mut::CellMut;
-use crate::nauty::{Set, graph::Graph};
-use crate::nauty::{SetTrait, graph};
+use crate::nauty::{NAUTY_INFINITY, SetTrait, graph};
 use bitvec::bitvec;
 use bitvec::order::Msb0;
-use std::mem::{replace, swap, take};
+use std::mem::swap;
 use std::ops::Index;
 
 pub mod cell;
@@ -22,7 +22,7 @@ pub struct Partition {
 }
 
 impl Partition {
-    pub fn new(mut nest: PartitionNest, level: usize) -> Self {
+    pub fn new(nest: PartitionNest, level: usize) -> Self {
         Self { nest, level }
     }
 
@@ -136,7 +136,7 @@ impl Partition {
         let non_singleton_cells: Vec<Cell> = self.cells().filter(|c| c.len() > 1).collect();
         let mut neighbours_counts: Vec<usize> = vec![0; non_singleton_cells.len()];
         for v2 in 1..non_singleton_cells.len() {
-            let workset = non_singleton_cells[v2].set(g.n());
+            let workset = non_singleton_cells[v2].to_set(g.n());
             println!("{workset:?}");
             for v1 in 0..v2 {
                 // Q why do we test only the first vertex of non_singleton_cells[v1]?
@@ -179,17 +179,12 @@ impl Partition {
      *****************************************************************************/
     // naugraph.c 495
     pub fn cheapautom(&self) -> bool {
-        let n = self.len();
-        let mut k = n;
+        let mut k = self.len();
         let mut nnt = 0;
-        for mut i in 0..n {
+        for c in self.cells() {
             k -= 1;
-            if self.nest.ptn[i] > self.level {
+            if !c.is_discrete() {
                 nnt += 1;
-                i += 1;
-                while self.nest.ptn[i] > self.level {
-                    i += 1;
-                }
             }
         }
         k <= nnt + 1 || k <= 4
@@ -273,6 +268,14 @@ impl Partition {
             }
         }
         (fix, mcr)
+    }
+
+    pub fn recover(&mut self) {
+        for p in self.nest.ptn.iter_mut() {
+            if *p > self.level {
+                *p = NAUTY_INFINITY;
+            }
+        }
     }
 }
 

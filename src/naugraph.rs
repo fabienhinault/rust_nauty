@@ -352,20 +352,6 @@ fn refine(
     *code = cleanup(longcode);
 }
 
-// pub fn bestcell(g: &Graph, partition: &Partition) -> usize {
-//     let i: usize = 0;
-//     let gp: &Set;
-//     let v1: usize;
-//     let v2: usize;
-//     let nnt: usize = 0;
-
-//     let workperm = partition.non_singleton_starts();
-//     if workperm.is_empty() {
-//         return g.n();
-//     }
-//     let bucket = vec![0; workperm.len()];
-// }
-
 /*****************************************************************************
 *                                                                            *
 *  targetcell(g,lab,ptn,level,tc_level,digraph,hint,m,n) returns the index   *

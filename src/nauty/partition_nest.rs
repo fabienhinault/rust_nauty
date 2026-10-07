@@ -1,4 +1,4 @@
-use crate::nauty::NAUTY_INFINITY;
+use crate::nauty::{NAUTY_INFINITY, Set, SetTrait};
 use partition_nest_chunk_by::PartitionNestChunkBy;
 use partition_nest_chunk_by_mut::PartitionNestChunkByMut;
 use std::{
@@ -29,6 +29,20 @@ impl PartitionNest {
         Self { lab, ptn }
     }
 
+    pub fn default_n(n: usize) -> Self {
+        let mut ptn = vec![NAUTY_INFINITY; n];
+        ptn[n - 1] = 0;
+        Self::new((0..n).collect(), ptn)
+    }
+
+    pub fn set_to_infinity(&mut self) {
+        for p in self.ptn.iter_mut() {
+            if *p != 0 {
+                *p = NAUTY_INFINITY;
+            }
+        }
+    }
+
     pub fn assert_is_sane(&self) {
         let mut lab = self.lab.clone();
         lab.sort();
@@ -47,7 +61,7 @@ impl PartitionNest {
         PartitionNestChunkByMut::new(&mut self.lab, &mut self.ptn, level)
     }
 
-    pub fn partition(mut self, level: usize) -> partition::Partition {
+    pub fn partition(self, level: usize) -> partition::Partition {
         partition::Partition { nest: self, level }
     }
 
@@ -91,6 +105,17 @@ impl PartitionNest {
 
     pub fn get(&self, i: usize) -> usize {
         self.lab[i]
+    }
+
+    pub fn to_active_set(&self) -> Set {
+        let mut active = Set::zeros(self.lab.len());
+        for mut i in 0..self.lab.len() {
+            active.add_one(i);
+            while self.ptn[i] != 0 {
+                i += 1;
+            }
+        }
+        active
     }
 }
 

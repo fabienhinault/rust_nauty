@@ -4,6 +4,11 @@ use crate::{
     nauty::{NautyCounter, graph},
 };
 
+#[inline(always)]
+fn xbit(i: usize) -> usize {
+    1 << i
+}
+
 fn xnextbit(i: usize) -> usize {
     i.leading_zeros() as usize
 }
@@ -96,8 +101,54 @@ impl Extender {
                     );
                 }
             }
+        } else {
+            for i in imin..imax {
+                if !rigid && xorb[i] != i {
+                    continue;
+                }
+                let x = self.data[n].xset(i);
+                let xc = self.data[n].xcard(i);
+                if xc == dmax && (x & d) != 0 {
+                    continue;
+                }
+                if (dlow & !x) != 0 {
+                    continue;
+                }
+                if accept1(
+                    g,
+                    n,
+                    x,
+                    &mut gx,
+                    deg,
+                    xc > dmax + 1 || (xc == dmax + 1 && (x & d) == 0),
+                ) && (self.connec == 0
+                    || (self.connec == 1 && gx.isconnected())
+                    || (self.connec == 2 && gx.isbiconnected()))
+                {
+                    ecount[ne + xc] += 1;
+                    println!(
+                        "{}",
+                        if self.canonise {
+                            gx.canonise().to_graph6()
+                        } else {
+                            gx.to_graph6()
+                        }
+                    );
+                }
+            }
         }
     }
+}
+
+fn accept1(
+    g: &mut graph::Graph,
+    n: usize,
+    x: usize,
+    gx: &mut graph::Graph,
+    deg: &[usize],
+    d: bool,
+) -> bool {
+    todo!()
 }
 
 fn accept2(
@@ -109,11 +160,6 @@ fn accept2(
     d: bool,
 ) -> bool {
     todo!()
-}
-
-#[inline(always)]
-fn xbit(i: usize) -> usize {
-    1 << i
 }
 
 /* form orbits on powerset of VG

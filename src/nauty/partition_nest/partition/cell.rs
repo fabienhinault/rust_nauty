@@ -36,6 +36,12 @@ impl<'a> Cell<'a> {
         self.cell_lab.to_vec()
     }
 
+    pub fn to_sorted_vec(&self) -> Vec<usize> {
+        let mut v = self.cell_lab.to_vec();
+        v.sort();
+        v
+    }
+
     pub fn get_splitters(&self) -> Set {
         let mut set = bitvec![usize, Msb0; 0; self.partition.nest.lab.len()];
         for i in self.cell_lab {
@@ -44,7 +50,7 @@ impl<'a> Cell<'a> {
         set
     }
 
-    pub fn set(&self, n: usize) -> Set {
+    pub fn to_set(&self, n: usize) -> Set {
         let mut cell_set = Set::zeros(n);
         for i in self.iter() {
             cell_set.add_one(*i);
