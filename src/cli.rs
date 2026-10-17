@@ -15,6 +15,18 @@ pub struct GengCli {
     pub trianglefree: bool,
     #[arg(short = 'f', default_value_t = false)]
     pub squarefree: bool,
+    #[arg(short = 'p', default_value_t = false)]
+    pub pentagonfree: bool,
+    #[arg(short = 'k', default_value_t = false)]
+    pub k4free: bool,
+    #[arg(short = 'S', default_value_t = false)]
+    pub splitgraph: bool,
+    #[arg(short = 'T', default_value_t = false)]
+    pub chordal: bool,
+    #[arg(short = 'P', default_value_t = false)]
+    pub perfect: bool,
+    #[arg(short = 'F', default_value_t = false)]
+    pub clawfree: bool,
     #[arg(short = 'b', default_value_t = false)]
     pub bipartite: bool,
     #[arg(short = 'v', default_value_t = false)]
@@ -51,5 +63,12 @@ pub struct GengCli {
     #[arg(long)]
     pub maxe: Option<usize>,
     //#[arg(value_parser = clap::value_parser!(u64).range(1..=(WORDSIZE as u64)))]
-    pub maxn: u64,
+    pub maxn: usize,
+}
+
+impl GengCli {
+    pub fn maxe(&self) -> usize {
+        let maxn = self.maxn;
+        self.maxe.unwrap_or(maxn * maxn - maxn)
+    }
 }
