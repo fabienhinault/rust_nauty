@@ -35,6 +35,30 @@ impl PartitionNest {
         Self::new((0..n).collect(), ptn)
     }
 
+    pub fn from_deg(deg: &[usize]) -> Self {
+        let nx = deg.len() + 1;
+        let degn = deg[deg.len() - 1];
+        let mut i0 = 0;
+        let mut i1 = deg.len();
+        let mut nest = Self::default_n(nx);
+        let lab = &mut nest.lab;
+        let ptn = &mut nest.ptn;
+        for i in 0..nx {
+            if deg[i] == degn {
+                lab[i1] = i;
+                i1 -= 1;
+            } else {
+                lab[i0] = i;
+                i0 += 1;
+            }
+            ptn[i1] = 1;
+        }
+        if i0 != 0 {
+            ptn[i1] = 0;
+        }
+        nest
+    }
+
     pub fn set_to_infinity(&mut self) {
         for p in self.ptn.iter_mut() {
             if *p != 0 {
@@ -107,6 +131,10 @@ impl PartitionNest {
         self.lab[i]
     }
 
+    pub fn get_ptn(&self, i: usize) -> usize {
+        self.ptn[i]
+    }
+
     pub fn to_active_set(&self) -> Set {
         let mut active = Set::zeros(self.lab.len());
         for mut i in 0..self.lab.len() {
@@ -116,6 +144,14 @@ impl PartitionNest {
             }
         }
         active
+    }
+
+    pub fn has_zero(&self) -> bool {
+        self.ptn[..self.ptn.len() - 1].iter().any(|&i| i == 0)
+    }
+
+    pub fn first_extra_zero(&self) -> Option<&usize> {
+        self.ptn[..self.ptn.len() - 1].iter().find(|&&i| i == 0)
     }
 }
 

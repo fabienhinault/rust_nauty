@@ -22,6 +22,7 @@ impl Graph {
     }
 
     pub fn new(vertex_count: usize) -> Self {
+        assert!(vertex_count > 0);
         Self::no_edge(vertex_count)
     }
 
@@ -79,12 +80,16 @@ impl Graph {
         self.0.len()
     }
 
+    pub fn edge_count(&self) -> usize {
+        self.0.iter().map(|v| v.count_ones()).sum::<usize>() / 2
+    }
+
     pub fn get(&self, i: usize) -> &Set {
         &self.0[i]
     }
 
     pub fn upper(&self, i: usize) -> Set {
-        self[i].masked(i)
+        self[i].masked_from(i)
     }
 
     // function ntog6 in gtools.c in nauty

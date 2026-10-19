@@ -40,7 +40,7 @@ fn cleanup(l: usize) -> usize {
 pub fn isautom(g: &graph::Graph, perm: &[usize]) -> bool {
     for (i_row, row) in g.0.iter().enumerate() {
         let p_row = g.get(perm[i_row]);
-        for pos in row.masked(i_row).ones_iter() {
+        for pos in row.masked_from(i_row).ones_iter() {
             if !p_row[perm[pos]] {
                 return false;
             }

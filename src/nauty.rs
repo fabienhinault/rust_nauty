@@ -61,7 +61,7 @@ use std::{
     fs::File,
     io::Read,
     mem,
-    ops::{Index, IndexMut},
+    ops::{Index, IndexMut, Range},
     rc::Rc,
     todo,
 };
@@ -175,6 +175,7 @@ pub trait SetTrait: Sized {
     fn difference(&self, other: &Self) -> Self;
     fn first_bit_nz_index(&self) -> usize;
     fn zeros(n: usize) -> Self;
+    fn ones(n: usize) -> Self;
     fn one(n: usize, index: usize) -> Self;
     fn add_one(&mut self, index: usize);
     fn remove_one(&mut self, index: usize);
@@ -182,8 +183,10 @@ pub trait SetTrait: Sized {
     fn filter(&self, other: &Self) -> Self;
     fn ones_iter(&self) -> SetIterator;
     fn rounding_ones_iter(&self, hint: usize) -> RoundingSetIterator;
-    fn bit_mask(&self, pos: usize) -> Self;
-    fn masked(&self, pos: usize) -> Self;
+    fn bit_mask_from(&self, pos: usize) -> Self;
+    fn bit_mask(&self, range: Range<usize>) -> Self;
+    fn masked_from(&self, pos: usize) -> Self;
+    fn masked(&self, range: Range<usize>) -> Self;
     fn permset(&self, perm: &[usize]) -> Self;
     fn takebit(&mut self) -> usize;
     fn is_zero(&self) -> bool;
@@ -218,6 +221,10 @@ impl SetTrait for Set {
         bitvec![usize, Msb0; 0; n]
     }
 
+    fn ones(n: usize) -> Self {
+        bitvec![usize, Msb0; 1; n]
+    }
+
     fn one(n: usize, index: usize) -> Self {
         let mut s = Self::zeros(n);
         s.set(index, true);
@@ -239,14 +246,25 @@ impl SetTrait for Set {
         }
     }
 
-    fn bit_mask(&self, pos: usize) -> Self {
+    fn bit_mask_from(&self, pos: usize) -> Self {
         let mut result = bitvec![usize, Msb0; 0; pos];
         result.extend_from_bitslice(self[0..self.len() - pos].iter().as_bitslice());
         result
     }
 
-    fn masked(&self, pos: usize) -> Self {
-        self.filter(&self.bit_mask(pos))
+    fn masked_from(&self, pos: usize) -> Self {
+        self.filter(&self.bit_mask_from(pos))
+    }
+
+    fn bit_mask(&self, range: Range<usize>) -> Self {
+        let mut result = bitvec![usize, Msb0; 0; range.start];
+        result.extend_from_bitslice(self[range.clone()].iter().as_bitslice());
+        result.extend_from_bitslice(&bitvec![usize, Msb0; 0; self.len() - range.end]);
+        result
+    }
+
+    fn masked(&self, range: Range<usize>) -> Self {
+        self.filter(&self.bit_mask(range))
     }
 
     /*****************************************************************************
@@ -325,7 +343,7 @@ impl Iterator for RoundingSetIterator {
     type Item = usize;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let setwd: Set = self.set.bit_mask(self.current_index);
+        let setwd: Set = self.set.bit_mask_from(self.current_index);
         let mut lz = setwd.leading_zeros();
         if lz == setwd.len() {
             lz = self.set.leading_zeros();
@@ -706,7 +724,7 @@ fn firstpathnode_nest(
             nauty_env.samerows = n;
             todo!();
         }
-        return partition.level - 1;
+        return Ok(partition.level - 1);
     }
     if nauty_env.noncheaplevel > partition.level && partition.cheapautom() {
         nauty_env.noncheaplevel = partition.level + 1;
@@ -735,7 +753,8 @@ fn firstpathnode_nest(
                 rtnlevel = firstpathnode_nest(
                     g_arg, partition, active, firstcode, stats, tc_level, firsttc, nauty_env,
                     options, canong_arg,
-                );
+                )
+                .unwrap();
                 _childcount = 1;
                 nauty_env.gca_first = level;
                 nauty_env.stabvertex = tv1;
@@ -748,7 +767,7 @@ fn firstpathnode_nest(
                 _childcount += 1;
             }
             if rtnlevel < level {
-                return rtnlevel;
+                return Ok(rtnlevel);
             }
             if nauty_env.needshortprune {
                 tcell.shortprune(&nauty_env.workspace[nauty_env.fmptr_index]);
@@ -769,7 +788,7 @@ fn firstpathnode_nest(
     if let Some(_userlevelproc) = options.userlevelproc {
         todo!();
     }
-    partition.level - 1
+    Ok(partition.level - 1)
 }
 
 /*****************************************************************************

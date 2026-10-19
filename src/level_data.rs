@@ -1,4 +1,4 @@
-use crate::env::Env;
+use crate::{env::Env, nauty::Set};
 //use bitvec::{order::Msb0, vec::BitVec};
 use std::cmp::min;
 
@@ -52,6 +52,7 @@ impl LevelData {
 
     //static void makeleveldata(boolean restricted)
     /* make the level data for each level */
+    // geng.c 1080
     pub fn make(restricted: bool, maxn: usize, maxdeg: usize) -> Vec<Self> {
         let mut data: Vec<LevelData> = Vec::with_capacity(maxn);
         data.push(LevelData::default());

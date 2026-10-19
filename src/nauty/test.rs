@@ -36,11 +36,11 @@ fn test_to_graph6() {
 fn test_from_graph6() {
     assert_eq!(
         create_example(),
-        modname::Graph::from_graph6("DQc".to_owned()).unwrap()
+        graph::Graph::from_graph6("DQc".to_owned()).unwrap()
     );
     assert_eq!(
         create_example(),
-        modname::Graph::from_graph6("DQc\n".to_owned()).unwrap()
+        graph::Graph::from_graph6("DQc\n".to_owned()).unwrap()
     );
 }
 

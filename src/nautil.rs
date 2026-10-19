@@ -30,7 +30,7 @@ impl SetWordNautilTrait for Set {
     // should be generally replaced by iteration on Set
     fn next_element(&self, pos: Option<usize>) -> Option<usize> {
         let setwd: Set = match pos {
-            Some(pos) => self.filter(&self.bit_mask(pos)),
+            Some(pos) => self.filter(&self.bit_mask_from(pos)),
             None => self.clone(),
         };
         let lz = setwd.leading_zeros();
