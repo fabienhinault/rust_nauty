@@ -432,6 +432,8 @@ mod tests {
     use bitvec::{bitvec, order::Msb0, vec::BitVec};
     use test_case::test_case;
 
+    #[test_case(Graph::from_u32(&[33554432,0,0,0,0,0,2147483648]), &[1,2,3,4,5,0,6], &[1,1,1,1,0,1,0], 0, 2, u32_to_bitvec(2214592512, 7), true, 0, &[1,2,3,4,5,0,6], &[1,1,1,1,0,1,0], 2, 0; "F??C?") ]
+    #[test_case(Graph::no_edge(3), &[2,1,0], &[1,1,0], 0, 1, u32_to_bitvec(2147483648, 3), false, 1, &[2,1,0], &[1,1,0], 1, 0)]
     #[test_case(Graph::no_edge(2), &[1,0], &[1, 0], 0, 1, u32_to_bitvec(2147483648, 2), false, 32767, &[1, 0], &[1,0], 1, 0)]
     #[allow(clippy::too_many_arguments)]
     fn test_nest(
