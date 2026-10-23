@@ -421,22 +421,17 @@ pub fn refinex(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::nauty::{
-        NAUTY_INFINITY,
-        partition_nest::PartitionNest,
-        test::{
-            create_complete, create_diamond, create_from_offsets, create_pentagram, graphs::cycle,
-        },
-        u32_to_bitvec,
-    };
-    use bitvec::{bitvec, order::Msb0, vec::BitVec};
+    use crate::nauty::{partition_nest::PartitionNest, u32_to_bitvec};
+    use bitvec::{order::Msb0, vec::BitVec};
     use test_case::test_case;
 
-    #[test_case(Graph::from_u32(&[33554432,0,0,0,0,0,2147483648]), &[1,2,3,4,5,0,6], &[1,1,1,1,0,1,0], 0, 2, u32_to_bitvec(2214592512, 7), true, 0, &[1,2,3,4,5,0,6], &[1,1,1,1,0,1,0], 2, 0; "F??C?") ]
+    #[test_case(Graph::from_edges(7, &[(0, 5),(0, 6),(1, 6)]), &[1,2,3,4,5,0,6], &[1,1,1,1,0,1,0], 0, 2, u32_to_bitvec(2214592512, 7), false, 0, &[2,3,4,1,5,0,6], &[1,1,0,1,0,1,0], 3, 0; "F?AE?")]
+    #[test_case(Graph::from_edges(6, &[(0, 5)]), &[1,2,3,4,5,0], &[1,1,1,0,1,0], 0, 2, u32_to_bitvec(2281701376, 6), false, 0, &[1,2,3,4,5,0], &[1,1,1,0,1,0], 2, 0; "E?A?")]
+    #[test_case(Graph::from_edges(7, &[(0, 6)]), &[1,2,3,4,5,0,6], &[1,1,1,1,0,1,0], 0, 2, u32_to_bitvec(2214592512, 7), true, 0, &[1,2,3,4,5,0,6], &[1,1,1,1,0,1,0], 2, 0; "F??C?")]
     #[test_case(Graph::no_edge(3), &[2,1,0], &[1,1,0], 0, 1, u32_to_bitvec(2147483648, 3), false, 1, &[2,1,0], &[1,1,0], 1, 0)]
     #[test_case(Graph::no_edge(2), &[1,0], &[1, 0], 0, 1, u32_to_bitvec(2147483648, 2), false, 32767, &[1, 0], &[1,0], 1, 0)]
     #[allow(clippy::too_many_arguments)]
-    fn test_nest(
+    fn test_refinex(
         g: graph::Graph,
         lab: &[usize],
         ptn: &[usize],
