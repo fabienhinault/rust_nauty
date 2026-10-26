@@ -70,25 +70,26 @@ pub mod partition_nest;
 #[cfg(test)]
 pub mod test;
 
-struct OptionBlk {
-    getcanon: u8,              /* make canong and canonlab? */
-    digraph: bool,             /* multiple edges or loops? */
-    writeautoms: bool,         /* write automorphisms? */
-    writemarkers: bool,        /* write stats on pts fixed, etc.? */
-    defaultptn: bool,          /* set lab,ptn,active for single cell? */
-    cartesian: bool,           /* use cartesian rep for writing automs? */
-    linelength: Option<usize>, /* max chars/line (excl. '\n') for output */
-    outfile: RefCell<File>,    /* file for output, if any */
-    usernodeproc: Option<()>,
+#[derive(Default)]
+pub struct OptionBlk {
+    pub getcanon: u8,                   /* make canong and canonlab? */
+    pub digraph: bool,                  /* multiple edges or loops? */
+    pub writeautoms: bool,              /* write automorphisms? */
+    pub writemarkers: bool,             /* write stats on pts fixed, etc.? */
+    pub defaultptn: bool,               /* set lab,ptn,active for single cell? */
+    pub cartesian: bool,                /* use cartesian rep for writing automs? */
+    pub linelength: Option<usize>,      /* max chars/line (excl. '\n') for output */
+    pub outfile: Option<RefCell<File>>, /* file for output, if any */
+    pub usernodeproc: Option<()>,
     /* procedure called for each automorphism */
-    userautomproc: Option<Box<dyn Fn(usize, &[usize], &[usize], usize, usize, usize) -> ()>>,
-    userlevelproc: Option<()>, /* procedure called for each level */
-    usercanonproc: Option<()>, /* procedure called for better labellings */
-    tc_level: usize,           /* max level for smart target cell choosing */
-    mininvarlevel: u8,         /* min level for invariant computation */
-    maxinvarlevel: u8,         /* max level for invariant computation */
-    invararg: u8,              /* value passed to (*invarproc)() */
-    schreier: bool,            /* use random schreier method */  // skip for now
+    pub userautomproc: Option<Box<dyn Fn(usize, &[usize], &[usize], usize, usize, usize) -> ()>>,
+    pub userlevelproc: Option<()>, /* procedure called for each level */
+    pub usercanonproc: Option<()>, /* procedure called for better labellings */
+    pub tc_level: usize,           /* max level for smart target cell choosing */
+    pub mininvarlevel: u8,         /* min level for invariant computation */
+    pub maxinvarlevel: u8,         /* max level for invariant computation */
+    pub invararg: u8,              /* value passed to (*invarproc)() */
+    pub schreier: bool,            /* use random schreier method */  // skip for now
 }
 
 impl OptionBlk {
@@ -107,20 +108,20 @@ impl OptionBlk {
     }
 }
 
-struct StatBlk {
-    grpsize1: f64, /* size of group is grpsize1 * 10^grpsize2 */
-    grpsize2: i64,
-    numorbits: usize,     /* number of orbits in group */
-    numgenerators: usize, /* number of generators found */
-    errstatus: u8,        /* if non-zero : an error code */
-    numnodes: usize,      /* total number of nodes */
-    numbadleaves: usize,  /* number of leaves of no use */
-    maxlevel: usize,      /* maximum depth of search */
-    tctotal: usize,       /* total size of all target cells */
-    canupdates: usize,    /* number of updates of best label */
-    invapplics: usize,    /* number of applications of invarproc */
-    invsuccesses: usize,  /* number of successful uses of invarproc() */
-    invarsuclevel: usize, /* least level where invarproc worked */
+pub struct StatBlk {
+    pub grpsize1: f64, /* size of group is grpsize1 * 10^grpsize2 */
+    pub grpsize2: i64,
+    pub numorbits: usize,     /* number of orbits in group */
+    pub numgenerators: usize, /* number of generators found */
+    pub errstatus: u8,        /* if non-zero : an error code */
+    pub numnodes: usize,      /* total number of nodes */
+    pub numbadleaves: usize,  /* number of leaves of no use */
+    pub maxlevel: usize,      /* maximum depth of search */
+    pub tctotal: usize,       /* total size of all target cells */
+    pub canupdates: usize,    /* number of updates of best label */
+    pub invapplics: usize,    /* number of applications of invarproc */
+    pub invsuccesses: usize,  /* number of successful uses of invarproc() */
+    pub invarsuclevel: usize, /* least level where invarproc worked */
 }
 
 impl StatBlk {
@@ -566,9 +567,9 @@ impl NautyEnv {
 *  FUNCTIONS CALLED: firstpathnode(),updatecan()                             *
 *                                                                            *
 *****************************************************************************/
-fn nauty(
-    g_arg: graph::Graph,
-    mut nest: PartitionNest,
+pub fn nauty(
+    g_arg: &mut graph::Graph,
+    nest: &mut PartitionNest,
     active_arg: Option<&Set>,
     orbits_arg: &mut Vec<usize>,
     options: &OptionBlk,
@@ -587,7 +588,7 @@ fn nauty(
     /* initialize everything: */
     active = Set::one(n, 0);
     if options.defaultptn {
-        nest = PartitionNest::default_n(n);
+        *nest = PartitionNest::default_n(n);
     } else {
         nest.set_to_infinity();
         match active_arg {
@@ -1081,7 +1082,7 @@ fn processnode(
             nauty_env.fmptr_index += 2;
             if options.writeautoms {
                 writeperm(
-                    options.outfile.borrow_mut().by_ref(),
+                    options.outfile.expect("outfile").borrow_mut().by_ref(),
                     &workperm,
                     options.cartesian,
                     options.linelength,

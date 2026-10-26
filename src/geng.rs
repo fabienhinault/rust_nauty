@@ -3,7 +3,7 @@ use crate::{
     graph::Graph,
     level_data::LevelData,
     nauty::{
-        NautyCounter, Set, SetTrait, graph,
+        NautyCounter, OptionBlk, Set, SetTrait, StatBlk, graph, nauty,
         partition_nest::{
             PartitionNest,
             partition::{Partition, cell_mut::SplitResult},
@@ -80,7 +80,7 @@ impl Extender {
         x: usize,
         gx: &mut graph::Graph,
         deg: &mut [usize],
-        d: bool,
+        rigid: &mut bool,
     ) -> bool {
         /* decide if n in theta(g+x) -  version for n+1 < maxn */
         let n = g.n();
@@ -118,8 +118,46 @@ impl Extender {
         if let Some(&extra_zero_index) = nest.first_extra_zero() {
             active.set(extra_zero_index + 1, true);
         }
-
-        false
+        let mut code = 0;
+        let mut partition = Partition { nest, level: 0 };
+        refinex(g, &mut partition, &mut active, false, &mut code);
+        if code < 0 {
+            return false;
+        }
+        if partition.is_discrete() {
+            *rigid = true;
+            return true;
+        }
+        let mut options: OptionBlk = OptionBlk::default();
+        options.getcanon = 1;
+        options.defaultptn = false;
+        options.userautomproc = Some(Box::new(
+            |count: usize,
+             p: &[usize],
+             orbits: &[usize],
+             numorbits: usize,
+             stabvertex: usize,
+             n: usize| self.userautomproc(count, p, orbits, numorbits, stabvertex, n),
+        ));
+        active = BitVec::zeros(nx);
+        let mut orbits: Vec<usize> = vec![];
+        let mut h: Graph = Graph::no_edge(nx);
+        let mut stats: StatBlk = StatBlk::default();
+        nauty(
+            gx,
+            &mut partition.nest,
+            Some(&active),
+            &mut orbits,
+            &options,
+            &mut stats,
+            &mut h,
+        );
+        if orbits[partition[n]] == orbits[n] {
+            *rigid = stats.numorbits == nx;
+            true
+        } else {
+            false
+        }
     }
 
     fn accept2(
@@ -225,15 +263,11 @@ impl Extender {
                 if (dlow & !x) != 0 {
                     continue;
                 }
-                if self.accept1(
-                    g,
-                    x,
-                    &mut gx,
-                    deg,
-                    xc > dmax + 1 || (xc == dmax + 1 && (x & d) == 0),
-                ) && (self.connec == 0
-                    || (self.connec == 1 && gx.isconnected())
-                    || (self.connec == 2 && gx.isbiconnected()))
+                let mut rigid = xc > dmax + 1 || (xc == dmax + 1 && (x & d) == 0);
+                if self.accept1(g, x, &mut gx, deg, &mut rigid)
+                    && (self.connec == 0
+                        || (self.connec == 1 && gx.isconnected())
+                        || (self.connec == 2 && gx.isbiconnected()))
                 {
                     ecount[ne + xc] += 1;
                     println!(
@@ -248,77 +282,76 @@ impl Extender {
             }
         }
     }
-}
 
-/* form orbits on powerset of VG
-called by nauty;  operates on data[n] */
-// 1190
-fn userautomproc(
-    count: usize,
-    p: &[usize],
-    orbits: &[usize],
-    numorbits: usize,
-    stabvertex: usize,
-    n: usize,
-    data: &mut LevelData,
-) {
-    // let xorb = &mut data.xorb;
-    // let xset = |i| data.xset(i);
-    // let xinv = &mut data.xinv;
-    let LevelData {
-        xorb,
-        x_set_card,
-        xinv,
-        ..
-    } = data;
-    let xset = |i: usize| x_set_card[i].set;
-    let lo = data.lo;
-    let hi = data.hi;
+    /* form orbits on powerset of VG
+    called by nauty;  operates on data[n] */
+    // 1190
+    fn userautomproc(
+        &mut self,
+        count: usize,
+        p: &[usize],
+        _orbits: &[usize],
+        _numorbits: usize,
+        _stabvertex: usize,
+        n: usize,
+    ) {
+        let lo = self.data[n].lo;
+        let hi = self.data[n].hi;
+        // let xorb = &mut data.xorb;
+        // let xset = |i| data.xset(i);
+        // let xinv = &mut data.xinv;
+        let LevelData {
+            xorb,
+            x_set_card,
+            xinv,
+            ..
+        } = &mut self.data[n];
+        let xset = |i: usize| x_set_card[i].set;
 
-    if count == 1 {
+        if count == 1 {
+            for i in lo..hi {
+                xorb[i] = i;
+            }
+        }
+        let mut moved = 0;
+        for i in 0..n {
+            if p[i] != i {
+                moved |= 1 << i;
+            }
+        }
         for i in lo..hi {
-            xorb[i] = i;
-        }
-    }
-    let mut moved = 0;
-    for i in 0..n {
-        if p[i] != i {
-            moved |= 1 << i;
-        }
-    }
-    for i in lo..hi {
-        let mut w = xset(i);
-        if w & moved == 0 {
-            continue;
-        }
-        let mut pxi = xset(i) & !moved;
-        while w != 0 {
-            let j1 = xnextbit(w);
-            w ^= 1 << j1;
-            pxi |= 1 << p[j1];
-        }
-        let pi = xinv[pxi].expect("xinv[pxi]");
-        let mut j1 = xorb[i];
-        while xorb[j1] != j1 {
-            j1 = xorb[j1];
-        }
-        let mut j2 = xorb[pi];
-        while xorb[j2] != j2 {
-            j2 = xorb[j2];
-        }
+            let mut w = xset(i);
+            if w & moved == 0 {
+                continue;
+            }
+            let mut pxi = xset(i) & !moved;
+            while w != 0 {
+                let j1 = xnextbit(w);
+                w ^= 1 << j1;
+                pxi |= 1 << p[j1];
+            }
+            let pi = xinv[pxi].expect("xinv[pxi]");
+            let mut j1 = xorb[i];
+            while xorb[j1] != j1 {
+                j1 = xorb[j1];
+            }
+            let mut j2 = xorb[pi];
+            while xorb[j2] != j2 {
+                j2 = xorb[j2];
+            }
 
-        if j1 < j2 {
-            xorb[pi] = j1;
-            xorb[i] = j1;
-            xorb[j2] = j1;
-        } else if j1 > j2 {
-            xorb[pi] = j2;
-            xorb[i] = j2;
-            xorb[j1] = j2;
+            if j1 < j2 {
+                xorb[pi] = j1;
+                xorb[i] = j1;
+                xorb[j2] = j1;
+            } else if j1 > j2 {
+                xorb[pi] = j2;
+                xorb[i] = j2;
+                xorb[j1] = j2;
+            }
         }
     }
 }
-
 /*****************************************************************************
 *                                                                            *
 *  refinex(g,lab,ptn,level,numcells,count,active,goodret,code,m,n) is a      *
