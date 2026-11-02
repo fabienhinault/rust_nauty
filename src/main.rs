@@ -47,8 +47,6 @@ static MAX_DEG: Lazy<usize> = Lazy::new(|| {
     }
     maxdeg
 });
-static DATA: LazyLock<Vec<LevelData>> =
-    LazyLock::new(|| LevelData::make(*SPARSE, *ARG_MAXN, *MAX_DEG));
 fn main() {
     let mut args = PARSED_ARGS.clone();
     let maxn = args.maxn;
@@ -98,10 +96,11 @@ fn main() {
             args.squarefree = true;
             sparse = true;
         }
-        let mut data: Vec<LevelData> = LevelData::make(sparse, maxn, maxdeg);
-        data[1].xbnds(&env, 1, 0, 0);
-        let xlb = data[1].xlb;
-        let xub = data[1].xub;
+        let data = LevelData::make(sparse, maxn, maxdeg);
+        let mut data_1 = data[1].borrow_mut();
+        data_1.xbnds(&env, 1, 0, 0);
+        let xlb = data_1.xlb;
+        let xub = data_1.xub;
         let mut extender = Extender {
             maxn,
             mindeg,
@@ -114,6 +113,7 @@ fn main() {
         let mut g = Graph::no_edge(0);
         /* counts by number of edges */
         let mut ecount: Vec<usize> = vec![];
-        extender.genextend(&mut g, 1, &mut deg, 0, true, xlb, xub, &mut ecount, DATA);
+        drop(data_1);
+        extender.genextend(&mut g, 1, &mut deg, 0, true, xlb, xub, &mut ecount, data);
     }
 }

@@ -1,6 +1,9 @@
-use crate::{env::Env, nauty::Set};
+use crate::{
+    env::Env,
+    nauty::{Set, UserAutomProc},
+};
 //use bitvec::{order::Msb0, vec::BitVec};
-use std::cmp::min;
+use std::{cell::RefCell, cmp::min, rc::Rc};
 
 const WORD_SIZE: usize = size_of::<usize>();
 const MAXN: usize = WORD_SIZE;
@@ -53,9 +56,9 @@ impl LevelData {
     //static void makeleveldata(boolean restricted)
     /* make the level data for each level */
     // geng.c 1080
-    pub fn make(restricted: bool, maxn: usize, maxdeg: usize) -> Vec<Self> {
-        let mut data: Vec<LevelData> = Vec::with_capacity(maxn);
-        data.push(LevelData::default());
+    pub fn make(restricted: bool, maxn: usize, maxdeg: usize) -> Vec<Rc<RefCell<Self>>> {
+        let mut data: Vec<Rc<RefCell<Self>>> = Vec::with_capacity(maxn);
+        data.push(Rc::new(RefCell::new(LevelData::default())));
         for n in 1..maxn {
             let nn = min(n, maxdeg);
             let mut ncj: usize = 1;
@@ -109,11 +112,11 @@ impl LevelData {
                 }
             }
             d.xstart[(d.xcard(nxsets - 1) + 1) as usize] = nxsets;
-            data.push(d);
+            data.push(Rc::new(RefCell::new(d)));
         }
 
         // Initialize xstart arrays for each level
-        for level in &mut data {
+        for mut level in data.iter().map(|d| d.borrow_mut()) {
             level.xstart = [0; MAXN + 1];
             level.x_set_card = Vec::new();
             level.xinv = Vec::new();
@@ -169,6 +172,78 @@ impl LevelData {
         self.dmax = dmax;
         self.xlb = xlb;
         self.xub = xub;
+    }
+}
+
+fn xnextbit(i: usize) -> usize {
+    i.leading_zeros() as usize
+}
+
+impl UserAutomProc for LevelData {
+    /* form orbits on powerset of VG
+    called by nauty;  operates on data[n] */
+    // geng.c 1190
+    fn userautomproc(
+        &mut self,
+        count: usize,
+        p: &[usize],
+        _orbits: &[usize],
+        _numorbits: usize,
+        _stabvertex: usize,
+        n: usize,
+    ) {
+        let lo = self.lo;
+        let hi = self.hi;
+        let Self {
+            xorb,
+            x_set_card,
+            xinv,
+            ..
+        } = self;
+        let xset = |i: usize| x_set_card[i].set;
+
+        if count == 1 {
+            for i in lo..hi {
+                xorb[i] = i;
+            }
+        }
+        let mut moved = 0;
+        for i in 0..n {
+            if p[i] != i {
+                moved |= 1 << i;
+            }
+        }
+        for i in lo..hi {
+            let mut w = xset(i);
+            if w & moved == 0 {
+                continue;
+            }
+            let mut pxi = xset(i) & !moved;
+            while w != 0 {
+                let j1 = xnextbit(w);
+                w ^= 1 << j1;
+                pxi |= 1 << p[j1];
+            }
+            let pi = xinv[pxi].expect("xinv[pxi]");
+            let mut j1 = xorb[i];
+            while xorb[j1] != j1 {
+                j1 = xorb[j1];
+            }
+            let mut j2 = xorb[pi];
+            while xorb[j2] != j2 {
+                j2 = xorb[j2];
+            }
+
+            if j1 < j2 {
+                xorb[pi] = j1;
+                xorb[i] = j1;
+                xorb[j2] = j1;
+            } else if j1 > j2 {
+                xorb[pi] = j2;
+                xorb[i] = j2;
+                xorb[j1] = j2;
+            }
+        }
     }
 }
 

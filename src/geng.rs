@@ -1,4 +1,4 @@
-use std::sync::LazyLock;
+use std::{cell::RefCell, rc::Rc, sync::LazyLock};
 
 use crate::{
     cli::GengCli,
@@ -78,13 +78,13 @@ impl Extender {
     /* decide if n in theta(g+x) -  version for n+1 < maxn */
     // 1711
     fn accept1(
-        &'static self,
+        &self,
         g: &mut graph::Graph,
         x: usize,
         gx: &mut graph::Graph,
         deg: &mut [usize],
         rigid: &mut bool,
-        data: &mut LevelData,
+        data: Rc<RefCell<LevelData>>,
     ) -> bool {
         /* decide if n in theta(g+x) -  version for n+1 < maxn */
         let n = g.n();
@@ -135,16 +135,7 @@ impl Extender {
         let mut options: OptionBlk = OptionBlk::default();
         options.getcanon = 1;
         options.defaultptn = false;
-        options.userautomproc = Some(Box::new(
-            |count: usize,
-             p: &[usize],
-             orbits: &[usize],
-             numorbits: usize,
-             stabvertex: usize,
-             n: usize| {
-                userautomproc(count, p, orbits, numorbits, stabvertex, n, data)
-            },
-        ));
+        options.userautomproc = Some(data.clone());
         active = BitVec::zeros(nx);
         let mut orbits: Vec<usize> = vec![];
         let mut h: Graph = Graph::no_edge(nx);
@@ -154,7 +145,7 @@ impl Extender {
             &mut partition.nest,
             Some(&active),
             &mut orbits,
-            &options,
+            &mut options,
             &mut stats,
             &mut h,
         );
@@ -181,7 +172,7 @@ impl Extender {
     /* extend from n to n+1 -- version for general graphs */
     // 2314
     pub fn genextend(
-        &'static mut self,
+        &mut self,
         g: &mut graph::Graph,
         n: usize,
         deg: &mut [usize],
@@ -190,7 +181,7 @@ impl Extender {
         xlb: usize,
         xub: usize,
         ecount: &mut [usize],
-        mut data: LazyLock<Vec<LevelData>>,
+        data: Vec<Rc<RefCell<LevelData>>>,
     ) {
         let mut xlb = xlb;
 
@@ -217,19 +208,19 @@ impl Extender {
         if xlb > xub {
             return;
         }
-
-        let imin = data[n].xstart[xlb];
-        let imax = data[n].xstart[xub + 1];
+        let data_n = data[n].borrow();
+        let imin = data_n.xstart[xlb];
+        let imax = data_n.xstart[xub + 1];
         //let x_set_card = &mut data.x_set_card;
-        let xorb = data[n].xorb.clone();
+        let xorb = data_n.xorb.clone();
         let mut gx: graph::Graph = graph::Graph::default();
         if nx == self.maxn {
             for i in imin..imax {
                 if !rigid && xorb[i] != i {
                     continue;
                 }
-                let x = data[n].xset(i);
-                let xc = data[n].xcard(i);
+                let x = data_n.xset(i);
+                let xc = data_n.xcard(i);
                 if xc == dmax && (x & d) != 0 {
                     continue;
                 }
@@ -263,8 +254,8 @@ impl Extender {
                 if !rigid && xorb[i] != i {
                     continue;
                 }
-                let x = data[n].xset(i);
-                let xc = data[n].xcard(i);
+                let x = data_n.xset(i);
+                let xc = data_n.xcard(i);
                 if xc == dmax && (x & d) != 0 {
                     continue;
                 }
@@ -272,16 +263,10 @@ impl Extender {
                     continue;
                 }
                 let mut rigid = xc > dmax + 1 || (xc == dmax + 1 && (x & d) == 0);
-                if self.accept1(
-                    g,
-                    x,
-                    &mut gx,
-                    deg,
-                    &mut rigid,
-                    data.get_mut(n).expect("data.get_mut"),
-                ) && (self.connec == 0
-                    || (self.connec == 1 && gx.isconnected())
-                    || (self.connec == 2 && gx.isbiconnected()))
+                if self.accept1(g, x, &mut gx, deg, &mut rigid, data[n].clone())
+                    && (self.connec == 0
+                        || (self.connec == 1 && gx.isconnected())
+                        || (self.connec == 2 && gx.isbiconnected()))
                 {
                     ecount[ne + xc] += 1;
                     println!(
@@ -297,6 +282,7 @@ impl Extender {
         }
     }
 }
+
 /* form orbits on powerset of VG
 called by nauty;  operates on data[n] */
 // 1190
@@ -382,11 +368,6 @@ pub fn refinex(
     goodret: bool,
     code: &mut isize,
 ) {
-    let mut split1: usize;
-    let mut split2: usize;
-    let mut longcode: usize;
-    let mut hint: usize;
-
     let n = g.n();
     if n == 1 {
         *code = 1;
@@ -396,7 +377,7 @@ pub fn refinex(
     let mut lact = active.clone();
     while !partition.is_discrete() && !lact.is_zero() {
         let split1 = lact.takebit();
-        split2 = partition.cell_end(split1);
+        let split2 = partition.cell_end(split1);
         let splitters = partition.get_splitters(split1);
         /* trivial splitting cell */
         if split1 == split2 {

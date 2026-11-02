@@ -70,6 +70,18 @@ pub mod partition_nest;
 #[cfg(test)]
 pub mod test;
 
+pub trait UserAutomProc {
+    fn userautomproc(
+        &mut self,
+        count: usize,
+        p: &[usize],
+        _orbits: &[usize],
+        _numorbits: usize,
+        _stabvertex: usize,
+        n: usize,
+    );
+}
+
 #[derive(Default)]
 pub struct OptionBlk {
     pub getcanon: u8,                   /* make canong and canonlab? */
@@ -82,7 +94,7 @@ pub struct OptionBlk {
     pub outfile: Option<RefCell<File>>, /* file for output, if any */
     pub usernodeproc: Option<()>,
     /* procedure called for each automorphism */
-    pub userautomproc: Option<Box<dyn FnMut(usize, &[usize], &[usize], usize, usize, usize) -> ()>>,
+    pub userautomproc: Option<Rc<RefCell<dyn UserAutomProc>>>,
     pub userlevelproc: Option<()>, /* procedure called for each level */
     pub usercanonproc: Option<()>, /* procedure called for better labellings */
     pub tc_level: usize,           /* max level for smart target cell choosing */
@@ -94,7 +106,7 @@ pub struct OptionBlk {
 
 impl OptionBlk {
     fn userautomproc(
-        &self,
+        &mut self,
         count: usize,
         p: &[usize],
         orbits: &[usize],
@@ -102,9 +114,10 @@ impl OptionBlk {
         stabvertex: usize,
         n: usize,
     ) {
-        self.userautomproc
-            .as_ref()
-            .map(|f| f(count, p, orbits, numorbits, stabvertex, n));
+        self.userautomproc.as_ref().map(|t| {
+            t.borrow_mut()
+                .userautomproc(count, p, orbits, numorbits, stabvertex, n)
+        });
     }
 }
 
@@ -572,7 +585,7 @@ pub fn nauty(
     nest: &mut PartitionNest,
     active_arg: Option<&Set>,
     orbits_arg: &mut Vec<usize>,
-    options: &OptionBlk,
+    options: &mut OptionBlk,
     _stats_arg: &mut StatBlk,
     canong_arg: &mut graph::Graph,
 ) -> Result<(), u8> {
@@ -685,7 +698,7 @@ fn firstpathnode_nest(
     tc_level: usize,
     firsttc: &mut VecMap,
     nauty_env: &mut NautyEnv,
-    options: &OptionBlk,
+    options: &mut OptionBlk,
     canong_arg: &mut graph::Graph,
 ) -> Result<usize, i8> {
     let n = g_arg.n();
@@ -814,7 +827,7 @@ fn othernode(
     tc_level: usize,
     firsttc: &mut VecMap,
     nauty_env: &mut NautyEnv,
-    options: &OptionBlk,
+    options: &mut OptionBlk,
     canong_arg: &mut graph::Graph,
 ) -> usize {
     let n = g_arg.n();
@@ -1021,7 +1034,7 @@ fn processnode(
     g: &graph::Graph,
     partition: &Partition,
     nauty_env: &mut NautyEnv,
-    options: &OptionBlk,
+    options: &mut OptionBlk,
     stats: &mut StatBlk,
     canong_arg: &mut graph::Graph,
 ) -> usize {
@@ -1098,7 +1111,7 @@ fn processnode(
             stats.numorbits = orbjoin(&mut nauty_env.orbits, &workperm);
             stats.numgenerators += 1;
             if let Some(userautomproc) = options.userautomproc.as_ref() {
-                userautomproc(
+                userautomproc.borrow_mut().userautomproc(
                     stats.numgenerators,
                     &workperm,
                     &nauty_env.orbits,
@@ -1151,7 +1164,7 @@ fn processnode(
             }
             stats.numgenerators += 1;
             if let Some(userautomproc) = options.userautomproc.as_ref() {
-                userautomproc(
+                userautomproc.borrow_mut().userautomproc(
                     stats.numgenerators,
                     &workperm,
                     &nauty_env.orbits,
