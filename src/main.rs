@@ -1,11 +1,12 @@
+use crate::nauty::graph;
 use clap::Parser;
 use cli::GengCli;
 use env::Env;
 use geng::Extender;
 use level_data::LevelData;
 use nauty::{WORDSIZE, graph::Graph};
-
-use crate::nauty::graph;
+use once_cell::sync::Lazy;
+use std::sync::LazyLock;
 
 pub mod cli;
 mod env;
@@ -18,10 +19,39 @@ mod nautil;
 pub mod nauty;
 
 const MAXN: usize = WORDSIZE;
+static PARSED_ARGS: Lazy<GengCli> = Lazy::new(GengCli::parse);
+static ARG_MAXN: LazyLock<usize> = LazyLock::new(|| PARSED_ARGS.maxn);
+static MAXE: LazyLock<usize> = LazyLock::new(|| {
+    PARSED_ARGS
+        .maxe
+        .unwrap_or((*ARG_MAXN * *ARG_MAXN - *ARG_MAXN) / 2)
+});
+static SPARSE: Lazy<bool> = Lazy::new(|| {
+    let mut sparse = PARSED_ARGS.bipartite
+        || PARSED_ARGS.squarefree
+        || PARSED_ARGS.trianglefree
+        || PARSED_ARGS.savemem;
+    if *ARG_MAXN > 28 || *ARG_MAXN + 4 > 8 * 64usize {
+        sparse = true;
+    }
+
+    if *ARG_MAXN == *MAXE + 1 && (PARSED_ARGS.connec1 || PARSED_ARGS.connec2) {
+        sparse = true;
+    }
+    sparse
+});
+static MAX_DEG: Lazy<usize> = Lazy::new(|| {
+    let mut maxdeg = PARSED_ARGS.maxdeg.unwrap_or(MAXN);
+    if maxdeg >= *MAXE {
+        maxdeg = *ARG_MAXN - 1;
+    }
+    maxdeg
+});
+static DATA: LazyLock<Vec<LevelData>> =
+    LazyLock::new(|| LevelData::make(*SPARSE, *ARG_MAXN, *MAX_DEG));
 fn main() {
-    let parsed_args = GengCli::parse();
-    let mut args = parsed_args.clone();
-    let maxn = args.maxn as usize;
+    let mut args = PARSED_ARGS.clone();
+    let maxn = args.maxn;
     let maxe = args.maxe.unwrap_or((maxn * maxn - maxn) / 2);
     let mut maxdeg = args.maxdeg.unwrap_or(MAXN);
     let mut mindeg = args.mindeg.unwrap_or(0);
@@ -70,14 +100,20 @@ fn main() {
         }
         let mut data: Vec<LevelData> = LevelData::make(sparse, maxn, maxdeg);
         data[1].xbnds(&env, 1, 0, 0);
-        // let xlb = data[1].xlb;
-        // let xub = data[1].xub;
-        // let mut extender = Extender {
-        //     maxn,
-        //     mindeg,
-        //     nodes: vec![],
-        //     data,
-        // };
-        // extender.genextend(&mut g, 1, &deg, 0, true, xlb, xub);
+        let xlb = data[1].xlb;
+        let xub = data[1].xub;
+        let mut extender = Extender {
+            maxn,
+            mindeg,
+            nodes: vec![],
+            connec,
+            canonise: args.canonise,
+            args,
+        };
+        let mut deg = [0];
+        let mut g = Graph::no_edge(0);
+        /* counts by number of edges */
+        let mut ecount: Vec<usize> = vec![];
+        extender.genextend(&mut g, 1, &mut deg, 0, true, xlb, xub, &mut ecount, DATA);
     }
 }

@@ -32,7 +32,7 @@ pub struct GengCli {
     #[arg(short = 'v', default_value_t = false)]
     verbose: bool,
     #[arg(short = 'l', default_value_t = false)]
-    canonise: bool,
+    pub canonise: bool,
     #[arg(short = 'y', default_value_t = false)]
     yformat: bool,
     // diff with original geng: -h is for help

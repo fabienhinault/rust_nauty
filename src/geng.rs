@@ -1,3 +1,5 @@
+use std::sync::LazyLock;
+
 use crate::{
     cli::GengCli,
     graph::Graph,
@@ -28,12 +30,14 @@ impl Graph {
     // geng.c 1469
     pub fn hask4(&self) -> bool {
         todo!();
+        false
     }
 
     /* Return TRUE if there is a claw (induced K(1,3)) involving the last vertex */
     // geng.c 1492
     pub fn hasclaw(&self) -> bool {
         todo!();
+        false
     }
 
     /* This function speeds up the generation of connected graphs
@@ -66,7 +70,6 @@ pub struct Extender {
     pub mindeg: usize,
     pub connec: u8,
     pub nodes: Vec<NautyCounter>,
-    pub data: Vec<LevelData>,
     pub canonise: bool,
     pub args: GengCli,
 }
@@ -75,12 +78,13 @@ impl Extender {
     /* decide if n in theta(g+x) -  version for n+1 < maxn */
     // 1711
     fn accept1(
-        &self,
+        &'static self,
         g: &mut graph::Graph,
         x: usize,
         gx: &mut graph::Graph,
         deg: &mut [usize],
         rigid: &mut bool,
+        data: &mut LevelData,
     ) -> bool {
         /* decide if n in theta(g+x) -  version for n+1 < maxn */
         let n = g.n();
@@ -137,13 +141,15 @@ impl Extender {
              orbits: &[usize],
              numorbits: usize,
              stabvertex: usize,
-             n: usize| self.userautomproc(count, p, orbits, numorbits, stabvertex, n),
+             n: usize| {
+                userautomproc(count, p, orbits, numorbits, stabvertex, n, data)
+            },
         ));
         active = BitVec::zeros(nx);
         let mut orbits: Vec<usize> = vec![];
         let mut h: Graph = Graph::no_edge(nx);
         let mut stats: StatBlk = StatBlk::default();
-        nauty(
+        let _ = nauty(
             gx,
             &mut partition.nest,
             Some(&active),
@@ -152,6 +158,7 @@ impl Extender {
             &mut stats,
             &mut h,
         );
+        options.userautomproc = None;
         if orbits[partition[n]] == orbits[n] {
             *rigid = stats.numorbits == nx;
             true
@@ -174,7 +181,7 @@ impl Extender {
     /* extend from n to n+1 -- version for general graphs */
     // 2314
     pub fn genextend(
-        &mut self,
+        &'static mut self,
         g: &mut graph::Graph,
         n: usize,
         deg: &mut [usize],
@@ -182,7 +189,8 @@ impl Extender {
         rigid: bool,
         xlb: usize,
         xub: usize,
-        ecount: &mut [i32],
+        ecount: &mut [usize],
+        mut data: LazyLock<Vec<LevelData>>,
     ) {
         let mut xlb = xlb;
 
@@ -210,18 +218,18 @@ impl Extender {
             return;
         }
 
-        let imin = self.data[n].xstart[xlb];
-        let imax = self.data[n].xstart[xub + 1];
+        let imin = data[n].xstart[xlb];
+        let imax = data[n].xstart[xub + 1];
         //let x_set_card = &mut data.x_set_card;
-        let xorb = &self.data[n].xorb;
+        let xorb = data[n].xorb.clone();
         let mut gx: graph::Graph = graph::Graph::default();
         if nx == self.maxn {
             for i in imin..imax {
                 if !rigid && xorb[i] != i {
                     continue;
                 }
-                let x = self.data[n].xset(i);
-                let xc = self.data[n].xcard(i);
+                let x = data[n].xset(i);
+                let xc = data[n].xcard(i);
                 if xc == dmax && (x & d) != 0 {
                     continue;
                 }
@@ -255,8 +263,8 @@ impl Extender {
                 if !rigid && xorb[i] != i {
                     continue;
                 }
-                let x = self.data[n].xset(i);
-                let xc = self.data[n].xcard(i);
+                let x = data[n].xset(i);
+                let xc = data[n].xcard(i);
                 if xc == dmax && (x & d) != 0 {
                     continue;
                 }
@@ -264,10 +272,16 @@ impl Extender {
                     continue;
                 }
                 let mut rigid = xc > dmax + 1 || (xc == dmax + 1 && (x & d) == 0);
-                if self.accept1(g, x, &mut gx, deg, &mut rigid)
-                    && (self.connec == 0
-                        || (self.connec == 1 && gx.isconnected())
-                        || (self.connec == 2 && gx.isbiconnected()))
+                if self.accept1(
+                    g,
+                    x,
+                    &mut gx,
+                    deg,
+                    &mut rigid,
+                    data.get_mut(n).expect("data.get_mut"),
+                ) && (self.connec == 0
+                    || (self.connec == 1 && gx.isconnected())
+                    || (self.connec == 2 && gx.isbiconnected()))
                 {
                     ecount[ne + xc] += 1;
                     println!(
@@ -282,73 +296,72 @@ impl Extender {
             }
         }
     }
+}
+/* form orbits on powerset of VG
+called by nauty;  operates on data[n] */
+// 1190
+fn userautomproc(
+    count: usize,
+    p: &[usize],
+    _orbits: &[usize],
+    _numorbits: usize,
+    _stabvertex: usize,
+    n: usize,
+    data: &mut LevelData,
+) {
+    let lo = data.lo;
+    let hi = data.hi;
+    // let xorb = &mut data.xorb;
+    // let xset = |i| data.xset(i);
+    // let xinv = &mut data.xinv;
+    let LevelData {
+        xorb,
+        x_set_card,
+        xinv,
+        ..
+    } = data;
+    let xset = |i: usize| x_set_card[i].set;
 
-    /* form orbits on powerset of VG
-    called by nauty;  operates on data[n] */
-    // 1190
-    fn userautomproc(
-        &mut self,
-        count: usize,
-        p: &[usize],
-        _orbits: &[usize],
-        _numorbits: usize,
-        _stabvertex: usize,
-        n: usize,
-    ) {
-        let lo = self.data[n].lo;
-        let hi = self.data[n].hi;
-        // let xorb = &mut data.xorb;
-        // let xset = |i| data.xset(i);
-        // let xinv = &mut data.xinv;
-        let LevelData {
-            xorb,
-            x_set_card,
-            xinv,
-            ..
-        } = &mut self.data[n];
-        let xset = |i: usize| x_set_card[i].set;
-
-        if count == 1 {
-            for i in lo..hi {
-                xorb[i] = i;
-            }
-        }
-        let mut moved = 0;
-        for i in 0..n {
-            if p[i] != i {
-                moved |= 1 << i;
-            }
-        }
+    if count == 1 {
         for i in lo..hi {
-            let mut w = xset(i);
-            if w & moved == 0 {
-                continue;
-            }
-            let mut pxi = xset(i) & !moved;
-            while w != 0 {
-                let j1 = xnextbit(w);
-                w ^= 1 << j1;
-                pxi |= 1 << p[j1];
-            }
-            let pi = xinv[pxi].expect("xinv[pxi]");
-            let mut j1 = xorb[i];
-            while xorb[j1] != j1 {
-                j1 = xorb[j1];
-            }
-            let mut j2 = xorb[pi];
-            while xorb[j2] != j2 {
-                j2 = xorb[j2];
-            }
+            xorb[i] = i;
+        }
+    }
+    let mut moved = 0;
+    for i in 0..n {
+        if p[i] != i {
+            moved |= 1 << i;
+        }
+    }
+    for i in lo..hi {
+        let mut w = xset(i);
+        if w & moved == 0 {
+            continue;
+        }
+        let mut pxi = xset(i) & !moved;
+        while w != 0 {
+            let j1 = xnextbit(w);
+            w ^= 1 << j1;
+            pxi |= 1 << p[j1];
+        }
+        let pi = xinv[pxi].expect("xinv[pxi]");
+        let mut j1 = xorb[i];
+        while xorb[j1] != j1 {
+            j1 = xorb[j1];
+        }
+        let mut j2 = xorb[pi];
+        while xorb[j2] != j2 {
+            j2 = xorb[j2];
+        }
 
-            if j1 < j2 {
-                xorb[pi] = j1;
-                xorb[i] = j1;
-                xorb[j2] = j1;
-            } else if j1 > j2 {
-                xorb[pi] = j2;
-                xorb[i] = j2;
-                xorb[j1] = j2;
-            }
+        if j1 < j2 {
+            xorb[pi] = j1;
+            xorb[i] = j1;
+            xorb[j2] = j1;
+        } else if j1 > j2 {
+            xorb[pi] = j2;
+            xorb[i] = j2;
+            xorb[j1] = j2;
         }
     }
 }

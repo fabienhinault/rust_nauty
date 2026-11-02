@@ -82,7 +82,7 @@ pub struct OptionBlk {
     pub outfile: Option<RefCell<File>>, /* file for output, if any */
     pub usernodeproc: Option<()>,
     /* procedure called for each automorphism */
-    pub userautomproc: Option<Box<dyn Fn(usize, &[usize], &[usize], usize, usize, usize) -> ()>>,
+    pub userautomproc: Option<Box<dyn FnMut(usize, &[usize], &[usize], usize, usize, usize) -> ()>>,
     pub userlevelproc: Option<()>, /* procedure called for each level */
     pub usercanonproc: Option<()>, /* procedure called for better labellings */
     pub tc_level: usize,           /* max level for smart target cell choosing */
@@ -614,7 +614,7 @@ pub fn nauty(
     nauty_env.invarsuclevel = NAUTY_INFINITY;
     nauty_env.invapplics = 0;
     nauty_env.invsuccesses = 0;
-    let mut partition = Partition::new(nest, 1);
+    let mut partition = Partition::new(nest.clone(), 1);
     firstpathnode_nest(
         &g_arg,
         &mut partition,
@@ -643,6 +643,7 @@ pub fn nauty(
         todo!();
     }
     *orbits_arg = nauty_env.orbits.clone();
+    *nest = partition.nest;
     Ok(())
 }
 
@@ -1082,7 +1083,12 @@ fn processnode(
             nauty_env.fmptr_index += 2;
             if options.writeautoms {
                 writeperm(
-                    options.outfile.expect("outfile").borrow_mut().by_ref(),
+                    options
+                        .outfile
+                        .as_ref()
+                        .expect("outfile")
+                        .borrow_mut()
+                        .by_ref(),
                     &workperm,
                     options.cartesian,
                     options.linelength,
@@ -1131,7 +1137,12 @@ fn processnode(
             }
             if options.writeautoms {
                 writeperm(
-                    options.outfile.borrow_mut().by_ref(),
+                    options
+                        .outfile
+                        .as_ref()
+                        .expect("outfile")
+                        .borrow_mut()
+                        .by_ref(),
                     &workperm,
                     options.cartesian,
                     options.linelength,

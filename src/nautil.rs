@@ -89,7 +89,7 @@ fn condnl(
     if let Some(linelength) = linelength
         && *curlen + x > linelength
     {
-        write!(writer, "\n   ");
+        let _ = write!(writer, "\n   ");
         *curlen = 3;
     }
 }

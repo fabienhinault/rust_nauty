@@ -46,7 +46,7 @@ impl Partition {
         self.nest.ptn.iter().find(|i| **i > self.level).copied()
     }
 
-    pub fn find_non_singleton(&self) -> Option<Cell> {
+    pub fn find_non_singleton(&self) -> Option<Cell<'_>> {
         self.cells().find(|c| c.len() > 1)
     }
 
@@ -160,7 +160,7 @@ impl Partition {
             .expect("bestcell")
     }
 
-    pub fn bestcell_mut(&mut self, g: &graph::Graph) -> CellMut {
+    pub fn bestcell_mut(&mut self, g: &graph::Graph) -> CellMut<'_> {
         let i = self.bestcell(g).first_lab_index;
         self.get_cell_mut(i)
     }
