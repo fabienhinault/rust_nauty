@@ -56,9 +56,9 @@ impl LevelData {
     //static void makeleveldata(boolean restricted)
     /* make the level data for each level */
     // geng.c 1080
-    pub fn make(restricted: bool, maxn: usize, maxdeg: usize) -> Vec<Rc<RefCell<Self>>> {
-        let mut data: Vec<Rc<RefCell<Self>>> = Vec::with_capacity(maxn);
-        data.push(Rc::new(RefCell::new(LevelData::default())));
+    pub fn make(restricted: bool, maxn: usize, maxdeg: usize) -> Vec<Self> {
+        let mut data: Vec<Self> = Vec::with_capacity(maxn);
+        data.push(LevelData::default());
         for n in 1..maxn {
             let nn = min(n, maxdeg);
             let mut ncj: usize = 1;
@@ -112,11 +112,11 @@ impl LevelData {
                 }
             }
             d.xstart[(d.xcard(nxsets - 1) + 1) as usize] = nxsets;
-            data.push(Rc::new(RefCell::new(d)));
+            data.push(d);
         }
 
         // Initialize xstart arrays for each level
-        for mut level in data.iter().map(|d| d.borrow_mut()) {
+        for mut level in data.iter_mut() {
             level.xstart = [0; MAXN + 1];
             level.x_set_card = Vec::new();
             level.xinv = Vec::new();

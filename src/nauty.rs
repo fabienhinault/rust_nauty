@@ -83,7 +83,7 @@ pub trait UserAutomProc {
 }
 
 #[derive(Default)]
-pub struct OptionBlk {
+pub struct OptionBlk<'a> {
     pub getcanon: u8,                   /* make canong and canonlab? */
     pub digraph: bool,                  /* multiple edges or loops? */
     pub writeautoms: bool,              /* write automorphisms? */
@@ -94,7 +94,7 @@ pub struct OptionBlk {
     pub outfile: Option<RefCell<File>>, /* file for output, if any */
     pub usernodeproc: Option<()>,
     /* procedure called for each automorphism */
-    pub userautomproc: Option<Rc<RefCell<dyn UserAutomProc>>>,
+    pub userautomproc: Option<&'a mut dyn UserAutomProc>,
     pub userlevelproc: Option<()>, /* procedure called for each level */
     pub usercanonproc: Option<()>, /* procedure called for better labellings */
     pub tc_level: usize,           /* max level for smart target cell choosing */
@@ -104,7 +104,7 @@ pub struct OptionBlk {
     pub schreier: bool,            /* use random schreier method */  // skip for now
 }
 
-impl OptionBlk {
+impl OptionBlk<'_> {
     fn userautomproc(
         &mut self,
         count: usize,
@@ -114,10 +114,9 @@ impl OptionBlk {
         stabvertex: usize,
         n: usize,
     ) {
-        self.userautomproc.as_ref().map(|t| {
-            t.borrow_mut()
-                .userautomproc(count, p, orbits, numorbits, stabvertex, n)
-        });
+        self.userautomproc
+            .as_mut()
+            .map(|t| t.userautomproc(count, p, orbits, numorbits, stabvertex, n));
     }
 }
 
@@ -1110,8 +1109,8 @@ fn processnode(
             }
             stats.numorbits = orbjoin(&mut nauty_env.orbits, &workperm);
             stats.numgenerators += 1;
-            if let Some(userautomproc) = options.userautomproc.as_ref() {
-                userautomproc.borrow_mut().userautomproc(
+            if let Some(userautomproc) = options.userautomproc.as_mut() {
+                userautomproc.userautomproc(
                     stats.numgenerators,
                     &workperm,
                     &nauty_env.orbits,
@@ -1163,8 +1162,8 @@ fn processnode(
                 );
             }
             stats.numgenerators += 1;
-            if let Some(userautomproc) = options.userautomproc.as_ref() {
-                userautomproc.borrow_mut().userautomproc(
+            if let Some(userautomproc) = options.userautomproc.as_mut() {
+                userautomproc.userautomproc(
                     stats.numgenerators,
                     &workperm,
                     &nauty_env.orbits,

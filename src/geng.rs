@@ -84,7 +84,7 @@ impl Extender {
         gx: &mut graph::Graph,
         deg: &mut [usize],
         rigid: &mut bool,
-        data: Rc<RefCell<LevelData>>,
+        data: &mut LevelData,
     ) -> bool {
         /* decide if n in theta(g+x) -  version for n+1 < maxn */
         let n = g.n();
@@ -135,7 +135,7 @@ impl Extender {
         let mut options: OptionBlk = OptionBlk::default();
         options.getcanon = 1;
         options.defaultptn = false;
-        options.userautomproc = Some(data.clone());
+        options.userautomproc = Some(data);
         active = BitVec::zeros(nx);
         let mut orbits: Vec<usize> = vec![];
         let mut h: Graph = Graph::no_edge(nx);
@@ -181,7 +181,7 @@ impl Extender {
         xlb: usize,
         xub: usize,
         ecount: &mut [usize],
-        data: Vec<Rc<RefCell<LevelData>>>,
+        mut data: Vec<LevelData>,
     ) {
         let mut xlb = xlb;
 
@@ -208,19 +208,18 @@ impl Extender {
         if xlb > xub {
             return;
         }
-        let data_n = data[n].borrow();
-        let imin = data_n.xstart[xlb];
-        let imax = data_n.xstart[xub + 1];
+        let imin = data[n].xstart[xlb];
+        let imax = data[n].xstart[xub + 1];
         //let x_set_card = &mut data.x_set_card;
-        let xorb = data_n.xorb.clone();
+        let xorb = data[n].xorb.clone();
         let mut gx: graph::Graph = graph::Graph::default();
         if nx == self.maxn {
             for i in imin..imax {
                 if !rigid && xorb[i] != i {
                     continue;
                 }
-                let x = data_n.xset(i);
-                let xc = data_n.xcard(i);
+                let x = data[n].xset(i);
+                let xc = data[n].xcard(i);
                 if xc == dmax && (x & d) != 0 {
                     continue;
                 }
@@ -250,12 +249,14 @@ impl Extender {
                 }
             }
         } else {
+            let xs: Vec<usize> = (imin..imax).map(|i| data[n].xset(i)).collect_vec();
+            let xcs: Vec<usize> = (imin..imax).map(|i| data[n].xcard(i)).collect_vec();
             for i in imin..imax {
                 if !rigid && xorb[i] != i {
                     continue;
                 }
-                let x = data_n.xset(i);
-                let xc = data_n.xcard(i);
+                let x = xs[i - imin];
+                let xc = xcs[i - imin];
                 if xc == dmax && (x & d) != 0 {
                     continue;
                 }
@@ -263,7 +264,7 @@ impl Extender {
                     continue;
                 }
                 let mut rigid = xc > dmax + 1 || (xc == dmax + 1 && (x & d) == 0);
-                if self.accept1(g, x, &mut gx, deg, &mut rigid, data[n].clone())
+                if self.accept1(g, x, &mut gx, deg, &mut rigid, &mut data[n])
                     && (self.connec == 0
                         || (self.connec == 1 && gx.isconnected())
                         || (self.connec == 2 && gx.isbiconnected()))
