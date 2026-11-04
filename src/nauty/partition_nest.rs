@@ -1,5 +1,5 @@
 use crate::{
-    iterator::partition_in_place,
+    iterator::{partition_in_place, partition_in_place_orig},
     nauty::{NAUTY_INFINITY, Set, SetTrait},
 };
 use partition_nest_chunk_by::PartitionNestChunkBy;
@@ -167,23 +167,7 @@ impl PartitionNest {
 
     pub(crate) fn apply_distance_invariant(&mut self, j0_start: usize, invar: &[usize]) -> usize {
         let qn: usize = *invar.last().unwrap();
-        let mut j0 = j0_start;
-        let mut j1: isize = (self.ptn.len() - 1) as isize;
-        while j0 as isize <= j1 {
-            let j = self.lab[j0];
-            let qv = invar[j];
-            if qv < qn {
-                j0 += 1;
-            } else {
-                self.lab[j0] = self.lab[j1 as usize];
-                self.lab[j1 as usize] = j;
-                j1 -= 1;
-            }
-        }
-        if j0 > 0 {
-            self.ptn[j1 as usize] = 0;
-        }
-        j0
+        partition_in_place_orig(&mut self.lab[j0_start..], |lab_i| invar[*lab_i] < qn)
     }
 }
 
