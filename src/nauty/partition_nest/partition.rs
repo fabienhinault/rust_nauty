@@ -277,6 +277,40 @@ impl Partition {
             }
         }
     }
+
+    pub(crate) fn cheapacc(&self, code: isize) -> bool {
+        let numcells = self.numcells();
+        let n = self.len();
+        if code > 0 || numcells >= n - 4 {
+            return true;
+        } else if numcells == n - 5 {
+            let j1 = self.nest.ptn[..=n - 2]
+                .iter()
+                .rfind(|ptn| **ptn == 0)
+                .copied()
+                .unwrap_or_default();
+            if n - j1 != 5 {
+                return true;
+            }
+        } else {
+            let mut j1 = n;
+            let mut j0 = 0;
+            for mut i1 in 0..n {
+                j1 -= 1;
+                if (self.nest.ptn[i1] > 0) {
+                    j0 += 1;
+                    i1 += 1;
+                    while self.nest.ptn[i1] > 0 {
+                        i1 += 1;
+                    }
+                }
+            }
+            if j1 <= j0 + 1 {
+                return true;
+            }
+        }
+        false
+    }
 }
 
 impl Index<usize> for Partition {

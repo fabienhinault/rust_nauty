@@ -132,10 +132,12 @@ impl Extender {
             *rigid = true;
             return true;
         }
-        let mut options: OptionBlk = OptionBlk::default();
-        options.getcanon = 1;
-        options.defaultptn = false;
-        options.userautomproc = Some(data);
+        let mut options: OptionBlk = OptionBlk {
+            getcanon: 1,
+            defaultptn: false,
+            userautomproc: Some(data),
+            ..Default::default()
+        };
         active = BitVec::zeros(nx);
         let mut orbits: Vec<usize> = vec![];
         let mut h: Graph = Graph::no_edge(nx);
@@ -158,17 +160,144 @@ impl Extender {
         }
     }
 
+    /* decide if n in theta(g+x)  --  version for n+1 == maxn */
+    // 1935
+    #[allow(clippy::too_many_arguments)]
     fn accept2(
         &self,
         g: &mut graph::Graph,
-        n: usize,
         x: usize,
         gx: &mut graph::Graph,
+        gcan: &mut graph::Graph,
         deg: &[usize],
-        d: bool,
+        nuniq: bool,
+        data: &mut LevelData,
     ) -> bool {
-        false
+        let n = g.n();
+        let nx = n + 1;
+        *gx = g.clone();
+        gx.0.push(Set::zeros(nx));
+        let mut degx: Vec<usize> = deg.to_vec();
+        let degn = x.count_ones() as usize;
+        degx.push(degn);
+        let mut xw = BitVec::from_bitslice(x.view_bits::<Msb0>().split_at(n).0);
+        while xw.any() {
+            let i = xw.leading_zeros() as usize;
+            let xwi = xw[i];
+            xw.set(i, !xwi);
+            gx[i].set(n, true);
+            gx[n].set(i, true);
+            degx[i] += 1;
+        }
+        if self.args.k4free && gx.hask4() {
+            return false;
+        }
+        if self.args.clawfree && gx.hasclaw() {
+            return false;
+        }
+        if self.args.connec2 && n + 2 == self.maxn && !g.isconnected() {
+            return false;
+        }
+        if ((self.args.connec2 && n + 2 < self.maxn) || (self.args.connec1 && n + 2 <= self.maxn))
+            && gx.connpreprune(&self.args)
+        {
+            return false;
+        }
+        if nuniq {
+            if self.args.canonise {
+                *gcan = gx.canonise();
+            }
+            return true;
+        }
+        let mut nest = PartitionNest::from_deg(&degx);
+        let mut active = Set::zeros(nx);
+        active.set(0, true);
+        match nest.first_extra_zero() {
+            None => {
+                let invar = gx.distinvar();
+                match invar {
+                    None => return false,
+                    Some(invar) => {
+                        let j0 = nest.apply_distance_invariant(0, &invar);
+                        if j0 > 0 {
+                            if j0 == n {
+                                if self.args.canonise {
+                                    *gcan = gx.canonise();
+                                }
+                                return true;
+                            }
+                            active.set(j0, true);
+                        }
+                    }
+                }
+            }
+            Some(&extra_zero_index) => {
+                active.set(extra_zero_index + 1, true);
+                let mut vmax: Set = Set::zeros(n);
+                for i in (extra_zero_index + 1)..nx {
+                    vmax.set(nest[i], true);
+                }
+                let mut gvs = vec![0; extra_zero_index + 1];
+                gvs.append(
+                    &mut ((extra_zero_index + 1)..nx)
+                        .map(|i| (gx[i].clone() & vmax.clone()).count_ones())
+                        .collect(),
+                );
+
+                let j0 = nest.apply_distance_invariant(extra_zero_index + 1, &gvs);
+                if j0 > 0 {
+                    if j0 == n {
+                        if self.args.canonise {
+                            *gcan = gx.canonise();
+                        }
+                        return true;
+                    }
+                    active.set(j0, true);
+                }
+            }
+        }
+        let mut code = 0;
+        let mut partition = Partition { nest, level: 0 };
+        refinex(g, &mut partition, &mut active, false, &mut code);
+        if code < 0 {
+            return false;
+        }
+        let cheapacc: bool = partition.cheapacc(code);
+        if cheapacc {
+            if self.args.canonise {
+                *gcan = gx.canonise();
+            }
+            return true;
+        }
+
+        let mut options: OptionBlk = OptionBlk::default();
+        options.getcanon = 1;
+        options.defaultptn = false;
+        options.userautomproc = Some(data);
+        active = BitVec::zeros(nx);
+        let mut orbits: Vec<usize> = vec![];
+        let mut h: Graph = Graph::no_edge(nx);
+        let mut stats: StatBlk = StatBlk::default();
+        let _ = nauty(
+            gx,
+            &mut partition.nest,
+            Some(&active),
+            &mut orbits,
+            &mut options,
+            &mut stats,
+            &mut h,
+        );
+        options.userautomproc = None;
+        if orbits[partition[n]] == orbits[n] {
+            if self.args.canonise {
+                *gcan = gx.canonise();
+            }
+            true
+        } else {
+            false
+        }
     }
+
     /* extend from n to n+1 -- version for general graphs */
     // 2314
     pub fn genextend(
@@ -188,14 +317,14 @@ impl Extender {
         self.nodes[n] += 1;
         let nx = n + 1;
         let dmax = deg[n - 1];
-        let dcrit = self.mindeg - self.maxn + n;
+        let dcrit: isize = self.mindeg as isize - self.maxn as isize + n as isize;
         let mut d: usize = 0;
         let mut dlow = 0;
         for i in 0..n {
             if deg[i] == dmax {
                 d |= xbit(i);
             }
-            if deg[i] == dcrit {
+            if deg[i] as isize == dcrit {
                 dlow |= xbit(i);
             }
         }
@@ -213,6 +342,7 @@ impl Extender {
         //let x_set_card = &mut data.x_set_card;
         let xorb = data[n].xorb.clone();
         let mut gx: graph::Graph = graph::Graph::default();
+        let mut gcan: graph::Graph = graph::Graph::default();
         if nx == self.maxn {
             for i in imin..imax {
                 if !rigid && xorb[i] != i {
@@ -228,11 +358,12 @@ impl Extender {
                 }
                 if self.accept2(
                     g,
-                    n,
                     x,
                     &mut gx,
+                    &mut gcan,
                     deg,
                     xc > dmax + 1 || (xc == dmax + 1 && (x & d) == 0),
+                    &mut data[n],
                 ) && (self.connec == 0
                     || (self.connec == 1 && gx.isconnected())
                     || (self.connec == 2 && gx.isbiconnected()))

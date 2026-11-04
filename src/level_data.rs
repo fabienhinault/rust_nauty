@@ -63,7 +63,7 @@ impl LevelData {
             let nn = min(n, maxdeg);
             let mut ncj: usize = 1;
             let mut nxsets: usize = 1;
-            for j in 1..nn {
+            for j in 1..=nn {
                 ncj = arith(ncj, n - j + 1, j);
                 nxsets += ncj;
             }
@@ -85,13 +85,10 @@ impl LevelData {
             } else {
                 (1 << n) - 1
             };
-            for i in 0..ilast {
+            for i in 0..=ilast {
                 let h: usize = i.count_ones() as usize;
                 if h <= maxdeg {
                     d.x_set_card.push(SetCard { card: h, set: i });
-                }
-                if i == ilast {
-                    break;
                 }
             }
 
@@ -113,15 +110,6 @@ impl LevelData {
             }
             d.xstart[(d.xcard(nxsets - 1) + 1) as usize] = nxsets;
             data.push(d);
-        }
-
-        // Initialize xstart arrays for each level
-        for mut level in data.iter_mut() {
-            level.xstart = [0; MAXN + 1];
-            level.x_set_card = Vec::new();
-            level.xinv = Vec::new();
-            level.xorb = Vec::new();
-            level.xx = Vec::new();
         }
 
         data

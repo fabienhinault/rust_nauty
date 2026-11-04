@@ -1,4 +1,7 @@
-use crate::nauty::{NAUTY_INFINITY, Set, SetTrait};
+use crate::{
+    iterator::partition_in_place,
+    nauty::{NAUTY_INFINITY, Set, SetTrait},
+};
 use partition_nest_chunk_by::PartitionNestChunkBy;
 use partition_nest_chunk_by_mut::PartitionNestChunkByMut;
 use std::{
@@ -36,27 +39,26 @@ impl PartitionNest {
     }
 
     pub fn from_deg(deg: &[usize]) -> Self {
-        let nx = deg.len() + 1;
+        let nx = deg.len();
         let degn = deg[deg.len() - 1];
         let mut i0 = 0;
-        let mut i1 = deg.len();
-        let mut nest = Self::default_n(nx);
-        let lab = &mut nest.lab;
-        let ptn = &mut nest.ptn;
-        for i in 0..nx {
-            if deg[i] == degn {
-                lab[i1] = i;
+        let mut i1 = (nx - 1) as isize;
+        let mut lab = vec![0; nx];
+        let mut ptn = vec![1; nx];
+        ptn[nx - 1] = 0;
+        for (i, deg_i) in deg.iter().enumerate() {
+            if *deg_i == degn {
+                lab[i1 as usize] = i;
                 i1 -= 1;
             } else {
                 lab[i0] = i;
                 i0 += 1;
             }
-            ptn[i1] = 1;
         }
         if i0 != 0 {
-            ptn[i1] = 0;
+            ptn[i1 as usize] = 0;
         }
-        nest
+        PartitionNest { lab, ptn }
     }
 
     pub fn set_to_infinity(&mut self) {
@@ -152,6 +154,36 @@ impl PartitionNest {
 
     pub fn first_extra_zero(&self) -> Option<&usize> {
         self.ptn[..self.ptn.len() - 1].iter().find(|&&i| i == 0)
+    }
+
+    pub(crate) fn apply_distance_invariant_alt(
+        &mut self,
+        j0_start: usize,
+        invar: &[usize],
+    ) -> usize {
+        let qn: usize = *invar.last().unwrap();
+        partition_in_place(&mut self.lab[j0_start..], |lab_i| invar[*lab_i] >= qn)
+    }
+
+    pub(crate) fn apply_distance_invariant(&mut self, j0_start: usize, invar: &[usize]) -> usize {
+        let qn: usize = *invar.last().unwrap();
+        let mut j0 = j0_start;
+        let mut j1: isize = (self.ptn.len() - 1) as isize;
+        while j0 as isize <= j1 {
+            let j = self.lab[j0];
+            let qv = invar[j];
+            if qv < qn {
+                j0 += 1;
+            } else {
+                self.lab[j0] = self.lab[j1 as usize];
+                self.lab[j1 as usize] = j;
+                j1 -= 1;
+            }
+        }
+        if j0 > 0 {
+            self.ptn[j1 as usize] = 0;
+        }
+        j0
     }
 }
 
@@ -303,5 +335,36 @@ mod test {
         assert_eq!(partition.numcells(), expected_numcells_after);
         assert_eq!(partition.nest.lab, expected_lab);
         assert_eq!(partition.nest.ptn, expected_ptn);
+    }
+
+    #[test_case(&[0,0], PartitionNest::new(vec![1, 0], vec![1, 0]))]
+    fn test_from_deg(deg: &[usize], nest: PartitionNest) {
+        assert_eq!(PartitionNest::from_deg(deg), nest);
+    }
+
+    #[test_case(PartitionNest::new(vec![1, 0], vec![1, 0]), 0, &[89, 89], PartitionNest::new(vec![0, 1], vec![1, 0]), 0)]
+    fn test_apply_distance_invariant(
+        mut before: PartitionNest,
+        j0_start: usize,
+        invar: &[usize],
+        after: PartitionNest,
+        expected: usize,
+    ) {
+        let actual = before.apply_distance_invariant(j0_start, invar);
+        assert_eq!(before, after);
+        assert_eq!(actual, expected);
+    }
+
+    #[test_case(PartitionNest::new(vec![1, 0], vec![1, 0]), 0, &[89, 89], PartitionNest::new(vec![1, 0], vec![1, 0]), 0)]
+    fn test_apply_distance_invariant_alt(
+        mut before: PartitionNest,
+        j0_start: usize,
+        invar: &[usize],
+        after: PartitionNest,
+        expected: usize,
+    ) {
+        let actual = before.apply_distance_invariant_alt(j0_start, invar);
+        assert_eq!(before, after);
+        assert_eq!(actual, expected);
     }
 }

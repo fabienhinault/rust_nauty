@@ -272,4 +272,35 @@ impl Graph {
             }
         }
     }
+
+    /* make distance invariant
+    return FALSE if n-1 not maximal else return TRUE */
+    // geng.c 760
+    pub fn distinvar(&self) -> Option<Vec<usize>> {
+        let n = self.n();
+        let mut invar = vec![0; n];
+        for v in (0..n).rev() {
+            let mut inv: usize = 0;
+            let mut sofar = Set::one(n, v);
+            let mut frontier = sofar.clone();
+            let mut d = 1;
+            while frontier.any() {
+                let mut workset = Set::zeros(n);
+                inv += frontier.count_ones() ^ (0x57 + d);
+                while frontier.any() {
+                    let w = frontier.leading_zeros();
+                    frontier.set(w, false);
+                    workset |= self.0[w].clone();
+                }
+                frontier = workset & !sofar.clone();
+                sofar |= frontier.clone();
+            }
+            invar[v] = inv;
+            if v < n - 1 && inv > invar[n - 1] {
+                return None;
+            }
+            d += 1;
+        }
+        Some(invar)
+    }
 }

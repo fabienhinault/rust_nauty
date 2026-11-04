@@ -13,6 +13,7 @@ mod env;
 mod geng;
 mod graph6;
 pub mod gtools;
+mod iterator;
 mod level_data;
 mod naugraph;
 mod nautil;
@@ -104,13 +105,13 @@ fn main() {
         let mut extender = Extender {
             maxn,
             mindeg,
-            nodes: vec![],
+            nodes: vec![0; maxn],
             connec,
             canonise: args.canonise,
             args,
         };
         let mut deg = [0];
-        let mut g = Graph::no_edge(0);
+        let mut g = Graph::no_edge(1);
         /* counts by number of edges */
         let mut ecount: Vec<usize> = vec![];
         extender.genextend(&mut g, 1, &mut deg, 0, true, xlb, xub, &mut ecount, data);

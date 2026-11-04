@@ -19,7 +19,7 @@ pub struct GengCli {
     pub pentagonfree: bool,
     #[arg(short = 'k', default_value_t = false)]
     pub k4free: bool,
-    #[arg(short = 'S', default_value_t = false)]
+    #[arg(long, default_value_t = false)]
     pub splitgraph: bool,
     #[arg(short = 'T', default_value_t = false)]
     pub chordal: bool,
@@ -48,7 +48,7 @@ pub struct GengCli {
     quiet: bool,
     #[arg(short = '$', default_value_t = false)]
     secret: bool,
-    #[arg(short = 'S', default_value_t = false)]
+    #[arg(long, default_value_t = false)]
     safe: bool,
     #[arg(short = 'd')]
     pub mindeg: Option<usize>,
