@@ -162,7 +162,7 @@ impl PartitionNest {
         invar: &[usize],
     ) -> usize {
         let qn: usize = *invar.last().unwrap();
-        partition_in_place(&mut self.lab[j0_start..], |lab_i| invar[*lab_i] >= qn)
+        partition_in_place(&mut self.lab[j0_start..], |lab_i| invar[*lab_i] < qn)
     }
 
     pub(crate) fn apply_distance_invariant(&mut self, j0_start: usize, invar: &[usize]) -> usize {
