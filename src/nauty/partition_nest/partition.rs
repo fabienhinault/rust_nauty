@@ -281,9 +281,9 @@ impl Partition {
     pub(crate) fn cheapacc(&self, code: isize) -> bool {
         let numcells = self.numcells();
         let n = self.len();
-        if code > 0 || numcells >= n - 4 {
+        if code > 0 || numcells + 4 >= n {
             return true;
-        } else if numcells == n - 5 {
+        } else if numcells + 5 == n {
             let j1 = self.nest.ptn[..=n - 2]
                 .iter()
                 .rfind(|ptn| **ptn == 0)
@@ -323,8 +323,11 @@ impl Index<usize> for Partition {
 
 #[cfg(test)]
 mod test {
+    use std::assert_eq;
+
     use super::*;
     use crate::nauty::{NAUTY_INFINITY, partition_nest::partition::Partition};
+    use test_case::test_case;
 
     const LAB: &[usize] = &[4, 6, 2, 0, 8, 7, 5, 9, 3, 1];
     const PTN: &[usize] = &[4, 3, 4, 1, 2, 4, 4, 0, 2, 0];
@@ -358,5 +361,10 @@ mod test {
         let partition = Partition::new(nest, 1);
         let best_cell = partition.bestcell(&g);
         assert_eq!(best_cell.first_lab_index, 2);
+    }
+
+    #[test_case(Partition::new(PartitionNest::new(vec![0, 1], vec![1, 0]), 1), 0, true)]
+    fn test_cheapacc(partition: Partition, code: isize, expected: bool) {
+        assert_eq!(partition.cheapacc(code), expected);
     }
 }

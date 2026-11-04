@@ -180,7 +180,7 @@ impl Extender {
         let mut degx: Vec<usize> = deg.to_vec();
         let degn = x.count_ones() as usize;
         degx.push(degn);
-        let mut xw = BitVec::from_bitslice(x.view_bits::<Msb0>().split_at(n).0);
+        let mut xw = BitVec::from_bitslice(x.view_bits::<Msb0>().split_at(nx).0);
         while xw.any() {
             let i = xw.leading_zeros() as usize;
             let xwi = xw[i];
@@ -258,7 +258,7 @@ impl Extender {
         }
         let mut code = 0;
         let mut partition = Partition { nest, level: 0 };
-        refinex(g, &mut partition, &mut active, false, &mut code);
+        refinex(gx, &mut partition, &mut active, false, &mut code);
         if code < 0 {
             return false;
         }
