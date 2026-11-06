@@ -3,7 +3,7 @@ use std::{cell::RefCell, rc::Rc, sync::LazyLock};
 use crate::{
     cli::GengCli,
     graph::Graph,
-    level_data::LevelData,
+    level_data::{LevelData, xnextbit},
     nauty::{
         NautyCounter, OptionBlk, Set, SetTrait, StatBlk, graph, nauty,
         partition_nest::{
@@ -19,10 +19,6 @@ use itertools::Itertools;
 #[inline(always)]
 fn xbit(i: usize) -> usize {
     1 << i
-}
-
-fn xnextbit(i: usize) -> usize {
-    i.leading_zeros() as usize
 }
 
 impl Graph {
@@ -93,14 +89,15 @@ impl Extender {
         gx.0[n] = Set::zeros(nx);
         let degn = x.count_ones() as usize;
         deg[n] = degn;
-        let mut xw = BitVec::from_bitslice(x.view_bits::<Msb0>().split_at(n).0);
+        let mut xw: BitVec<usize, Msb0> =
+            BitVec::from_bitslice(x.view_bits::<Msb0>().split_at(n).0);
         while xw.any() {
             let i = xw.leading_zeros() as usize;
-            let xwi = xw[i];
-            xw.set(i, !xwi);
-            gx[i].set(n, true);
-            gx[n].set(i, true);
-            deg[i] += 1;
+            let ii = xw.len() - 1 - i;
+            xw.set(i, false);
+            gx[ii].set(n, true);
+            gx[n].set(ii, true);
+            deg[ii] += 1;
         }
         if self.args.k4free && gx.hask4() {
             return false;
@@ -169,7 +166,7 @@ impl Extender {
         x: usize,
         gx: &mut graph::Graph,
         gcan: &mut graph::Graph,
-        deg: &[usize],
+        deg: &mut [usize],
         nuniq: bool,
         data: &mut LevelData,
     ) -> bool {
@@ -180,14 +177,14 @@ impl Extender {
         let mut degx: Vec<usize> = deg.to_vec();
         let degn = x.count_ones() as usize;
         degx.push(degn);
-        let mut xw = BitVec::from_bitslice(x.view_bits::<Msb0>().split_at(nx).0);
+        let mut xw = BitVec::from_bitslice(x.view_bits::<Msb0>());
         while xw.any() {
             let i = xw.leading_zeros() as usize;
-            let xwi = xw[i];
-            xw.set(i, !xwi);
-            gx[i].set(n, true);
-            gx[n].set(i, true);
-            degx[i] += 1;
+            let ii = xw.len() - 1 - i;
+            xw.set(i, false);
+            gx[ii].set(n, true);
+            gx[n].set(ii, true);
+            deg[ii] += 1;
         }
         if self.args.k4free && gx.hask4() {
             return false;
@@ -233,7 +230,7 @@ impl Extender {
             }
             Some(&extra_zero_index) => {
                 active.set(extra_zero_index + 1, true);
-                let mut vmax: Set = Set::zeros(n);
+                let mut vmax: Set = Set::zeros(nx);
                 for i in (extra_zero_index + 1)..nx {
                     vmax.set(nest[i], true);
                 }

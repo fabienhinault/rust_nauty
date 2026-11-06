@@ -36,6 +36,10 @@ pub struct LevelData {
     xlim: usize, /* number of x-sets in xx[] */
 }
 
+pub fn xnextbit(i: usize) -> usize {
+    size_of::<usize>() - 1 - i.leading_zeros() as usize
+}
+
 fn arith(a: usize, b: usize, c: usize) -> usize {
     (a / c) * b + ((a % c) * b) / c
 }
@@ -161,10 +165,6 @@ impl LevelData {
         self.xlb = xlb;
         self.xub = xub;
     }
-}
-
-fn xnextbit(i: usize) -> usize {
-    i.leading_zeros() as usize
 }
 
 impl UserAutomProc for LevelData {

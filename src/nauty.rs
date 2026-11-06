@@ -205,6 +205,7 @@ pub trait SetTrait: Sized {
     fn is_zero(&self) -> bool;
     fn shortprune(&mut self, set2: &Self);
     fn longprune(self, fix: &Self, fms: &[Self]) -> Self;
+    fn xnextbit(&self) -> usize;
 }
 
 impl SetTrait for Set {
@@ -334,6 +335,10 @@ impl SetTrait for Set {
             }
         }
         self
+    }
+
+    fn xnextbit(&self) -> usize {
+        self.len() - 1 - self.first_bit_nz_index()
     }
 }
 
