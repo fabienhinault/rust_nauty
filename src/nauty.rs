@@ -63,7 +63,7 @@ use std::{
     mem,
     ops::{Index, IndexMut, Range},
     rc::Rc,
-    todo,
+    todo, vec,
 };
 
 pub mod partition_nest;
@@ -519,6 +519,7 @@ impl NautyEnv {
         Self {
             firstcode: vec![0; n + 2],
             firsttc: vec![0; n + 2],
+            canoncode: vec![0; n + 2],
             ..Default::default()
         }
     }
@@ -622,7 +623,7 @@ pub fn nauty(
     if options.schreier {
         todo!();
     }
-    *orbits_arg = (0..n).collect();
+    nauty_env.orbits = (0..n).collect();
     let mut stats: StatBlk = StatBlk::new(n);
     nauty_env.fixedpts = Set::zeros(n);
     nauty_env.noncheaplevel = 1;
@@ -762,13 +763,13 @@ fn firstpathnode_nest(
     let cell_lab: Vec<usize> = tcel.as_ref().map(Cell::to_sorted_vec).unwrap_or(vec![]);
     let tv1 = cell_lab[0];
     let tc = cell_lab[0];
+    partition.advance();
     for tv in cell_lab.iter().copied() {
         if nauty_env.orbits[tv] == tv {
             partition.breakout(tc, tv);
             nauty_env.fixedpts.add_one(tv);
             nauty_env.cosetindex = tv;
             if tv == tv1 {
-                partition.advance();
                 rtnlevel = firstpathnode_nest(
                     g_arg, partition, active, firstcode, stats, tc_level, firsttc, nauty_env,
                     options, canong_arg,
@@ -778,7 +779,6 @@ fn firstpathnode_nest(
                 nauty_env.gca_first = level;
                 nauty_env.stabvertex = tv1;
             } else {
-                partition.advance();
                 rtnlevel = othernode(
                     g_arg, partition, active, stats, tc_level, firsttc, nauty_env, options,
                     canong_arg,

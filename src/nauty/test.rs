@@ -155,6 +155,12 @@ fn test_join() {
     assert_eq!(g, create_diamond());
 }
 
+#[test]
+fn test_disjoint_union() {
+    let g = graph::Graph::disjoint_union(&graph::Graph::one(), &graphs::path(3));
+    assert_eq!("CH\n", g.to_graph6());
+}
+
 // example from https://users.cecs.anu.edu.au/~bdm/data/formats.txt, line 73
 //
 //  2---0---4---3---1

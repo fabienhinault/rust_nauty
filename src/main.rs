@@ -110,7 +110,7 @@ fn main() {
             canonise: args.canonise,
             args,
         };
-        let mut deg = [0];
+        let mut deg = vec![0];
         let mut g = Graph::no_edge(1);
         /* counts by number of edges */
         let mut ecount: Vec<usize> = vec![0; 1 + maxn * (maxn - 1) / 2];

@@ -78,21 +78,20 @@ impl Extender {
         g: &mut graph::Graph,
         x: usize,
         gx: &mut graph::Graph,
-        deg: &mut [usize],
+        deg: &mut Vec<usize>,
         rigid: &mut bool,
         data: &mut LevelData,
     ) -> bool {
         /* decide if n in theta(g+x) -  version for n+1 < maxn */
         let n = g.n();
         let nx = n + 1;
-        gx.0[..n].clone_from_slice(&g.0[..n]);
-        gx.0[n] = Set::zeros(nx);
+        *gx = Graph::disjoint_union(g, &Graph::one());
         let degn = x.count_ones() as usize;
-        deg[n] = degn;
+        deg.push(degn);
         let mut xw: BitVec<usize, Msb0> =
             BitVec::from_bitslice(x.view_bits::<Msb0>().split_at(n).0);
         while xw.any() {
-            let i = xw.leading_zeros() as usize;
+            let i = xw.leading_zeros();
             let ii = xw.len() - 1 - i;
             xw.set(i, false);
             gx[ii].set(n, true);
@@ -172,14 +171,13 @@ impl Extender {
     ) -> bool {
         let n = g.n();
         let nx = n + 1;
-        *gx = g.clone();
-        gx.0.push(Set::zeros(nx));
+        *gx = Graph::disjoint_union(g, &Graph::one());
         let mut degx: Vec<usize> = deg.to_vec();
         let degn = x.count_ones() as usize;
         degx.push(degn);
         let mut xw = BitVec::from_bitslice(x.view_bits::<Msb0>());
         while xw.any() {
-            let i = xw.leading_zeros() as usize;
+            let i = xw.leading_zeros();
             let ii = xw.len() - 1 - i;
             xw.set(i, false);
             gx[ii].set(n, true);
@@ -301,7 +299,7 @@ impl Extender {
         &mut self,
         g: &mut graph::Graph,
         n: usize,
-        deg: &mut [usize],
+        deg: &mut Vec<usize>,
         ne: usize,
         rigid: bool,
         xlb: usize,
@@ -366,7 +364,7 @@ impl Extender {
                     || (self.connec == 2 && gx.isbiconnected()))
                 {
                     ecount[ne + xc] += 1;
-                    println!(
+                    print!(
                         "{}",
                         if self.canonise {
                             gx.canonise().to_graph6()

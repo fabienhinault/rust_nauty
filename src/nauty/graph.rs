@@ -58,22 +58,32 @@ impl Graph {
         )
     }
 
+    /// The graph join G=G_1+G_2 of graphs G_1 and G_2 with disjoint sets V_1 and V_2 of vertices and
+    /// edge sets X_1 and X_2 is the graph union G_1 union G_2 together with all the edges joining V_1 and V_2.
     pub fn join(first: &Self, second: &Self) -> Self {
+        Self::extend(first, second, 1)
+    }
+
+    fn extend(first: &Self, second: &Self, value: usize) -> Self {
         let mut upper = first
             .0
             .clone()
             .into_iter()
             .map(|mut bv| {
-                bv.extend(bitvec![usize, Msb0; 1; second.n()]);
+                bv.extend(bitvec![usize, Msb0; value; second.n()]);
                 bv
             })
             .collect::<Vec<_>>();
         upper.extend(second.0.clone().into_iter().map(|bv| {
-            let mut bv2 = bitvec![usize, Msb0; 1; first.n()];
+            let mut bv2 = bitvec![usize, Msb0; value; first.n()];
             bv2.extend(bv.iter());
             bv2
         }));
         Graph(upper)
+    }
+
+    pub fn disjoint_union(first: &Self, second: &Self) -> Self {
+        Self::extend(first, second, 0)
     }
 
     pub fn n(&self) -> usize {
