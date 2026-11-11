@@ -202,7 +202,7 @@ impl Partition {
      *                                                                            *
      *****************************************************************************/
     // nautil.c 613
-    /// Operate at level + 1, isolate vertex tv in one cell, and other ones
+    /// isolate vertex tv in one cell, and other ones
     /// in another.
     pub fn breakout(&mut self, tc: usize, tv: usize) {
         let lab = &mut self.nest.lab;
@@ -213,7 +213,7 @@ impl Partition {
             swap(&mut tmp, &mut lab[i]);
             i += 1;
         }
-        self.nest.ptn[tc] = self.level + 1;
+        self.nest.ptn[tc] = self.level;
     }
 
     pub fn advance(&mut self) {

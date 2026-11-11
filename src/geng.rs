@@ -88,8 +88,7 @@ impl Extender {
         *gx = Graph::disjoint_union(g, &Graph::one());
         let degn = x.count_ones() as usize;
         deg.push(degn);
-        let mut xw: BitVec<usize, Msb0> =
-            BitVec::from_bitslice(x.view_bits::<Msb0>().split_at(n).0);
+        let mut xw: BitVec<usize, Msb0> = BitVec::from_bitslice(x.view_bits::<Msb0>());
         while xw.any() {
             let i = xw.leading_zeros();
             let ii = xw.len() - 1 - i;
