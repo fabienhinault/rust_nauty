@@ -58,10 +58,14 @@ pub struct GengCli {
     multiplicity: Option<i32>,
     // split level increment
     #[arg(short = 'X')]
-    splitlevinc: Option<i32>,
+    pub splitlevinc: Option<isize>,
     // diff with original geng
     #[arg(long)]
     pub maxe: Option<usize>,
+    #[arg(long)]
+    pub r#mod: Option<usize>,
+    #[arg(long)]
+    pub res: Option<usize>,
     //#[arg(value_parser = clap::value_parser!(u64).range(1..=(WORDSIZE as u64)))]
     pub maxn: usize,
 }

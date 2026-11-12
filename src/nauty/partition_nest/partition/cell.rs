@@ -50,7 +50,8 @@ impl<'a> Cell<'a> {
         set
     }
 
-    pub fn to_set(&self, n: usize) -> Set {
+    pub fn to_set(&self) -> Set {
+        let n = self.partition.len();
         let mut cell_set = Set::zeros(n);
         for i in self.iter() {
             cell_set.add_one(*i);

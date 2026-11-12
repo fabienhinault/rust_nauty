@@ -16,8 +16,8 @@ pub struct SetCard {
 }
 #[derive(Default)]
 pub struct LevelData {
-    edge_count: usize, /* values used for xlb,xub calculation */
-    dmax: usize,
+    pub edge_count: usize, /* values used for xlb,xub calculation */
+    pub dmax: usize,
     /* saved bounds on extension degree */
     // extension degree lower bound
     pub xlb: usize,

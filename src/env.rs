@@ -1,3 +1,4 @@
+#[derive(Clone)]
 pub struct Env {
     pub maxn: usize,
     pub maxe: usize,

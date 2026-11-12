@@ -98,10 +98,29 @@ fn main() {
             sparse = true;
         }
         let mut data = LevelData::make(sparse, maxn, maxdeg);
+
+        let modulo = args.r#mod.unwrap_or(1);
+        let mut splitlevel = if args.maxn >= 14 && modulo > 1 {
+            (args.maxn - 4) as isize
+        } else if args.maxn >= 6 && modulo > 1 {
+            (args.maxn - 3) as isize
+        } else {
+            -1
+        };
+        if splitlevel > 0 {
+            splitlevel += args.splitlevinc.unwrap_or(0);
+        }
+        if splitlevel > (args.maxn - 1) as isize {
+            splitlevel = (args.maxn - 1) as isize;
+        }
+        if splitlevel < 3 {
+            splitlevel = -1;
+        }
         let data_1 = &mut data[1];
         data_1.xbnds(&env, 1, 0, 0);
         let xlb = data_1.xlb;
         let xub = data_1.xub;
+
         let mut extender = Extender {
             maxn,
             mindeg,
@@ -109,11 +128,23 @@ fn main() {
             connec,
             canonise: args.canonise,
             args,
+            splitlevel,
+            env: env.clone(),
         };
         let mut deg = vec![0];
         let mut g = Graph::no_edge(1);
         /* counts by number of edges */
         let mut ecount: Vec<usize> = vec![0; 1 + maxn * (maxn - 1) / 2];
-        extender.genextend(&mut g, 1, &mut deg, 0, true, xlb, xub, &mut ecount, data);
+        extender.genextend(
+            &mut g,
+            1,
+            &mut deg,
+            0,
+            true,
+            xlb,
+            xub,
+            &mut ecount,
+            &mut data,
+        );
     }
 }

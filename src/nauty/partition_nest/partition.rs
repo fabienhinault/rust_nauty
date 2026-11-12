@@ -136,7 +136,7 @@ impl Partition {
         let non_singleton_cells: Vec<Cell> = self.cells().filter(|c| c.len() > 1).collect();
         let mut neighbours_counts: Vec<usize> = vec![0; non_singleton_cells.len()];
         for v2 in 1..non_singleton_cells.len() {
-            let workset = non_singleton_cells[v2].to_set(g.n());
+            let workset = non_singleton_cells[v2].to_set();
             println!("{workset:?}");
             for v1 in 0..v2 {
                 // Q why do we test only the first vertex of non_singleton_cells[v1]?

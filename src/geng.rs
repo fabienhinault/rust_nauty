@@ -1,7 +1,6 @@
-use std::{cell::RefCell, rc::Rc, sync::LazyLock};
-
 use crate::{
     cli::GengCli,
+    env::Env,
     graph::Graph,
     level_data::{LevelData, xnextbit},
     nauty::{
@@ -68,6 +67,8 @@ pub struct Extender {
     pub nodes: Vec<NautyCounter>,
     pub canonise: bool,
     pub args: GengCli,
+    pub splitlevel: isize,
+    pub env: Env,
 }
 
 impl Extender {
@@ -82,12 +83,15 @@ impl Extender {
         rigid: &mut bool,
         data: &mut LevelData,
     ) -> bool {
-        /* decide if n in theta(g+x) -  version for n+1 < maxn */
         let n = g.n();
         let nx = n + 1;
         *gx = Graph::disjoint_union(g, &Graph::one());
         let degn = x.count_ones() as usize;
-        deg.push(degn);
+        if deg.len() == n {
+            deg.push(degn);
+        } else {
+            deg[n] = degn;
+        }
         let mut xw: BitVec<usize, Msb0> = BitVec::from_bitslice(x.view_bits::<Msb0>());
         while xw.any() {
             let i = xw.leading_zeros();
@@ -171,7 +175,7 @@ impl Extender {
         let n = g.n();
         let nx = n + 1;
         *gx = Graph::disjoint_union(g, &Graph::one());
-        let mut degx: Vec<usize> = deg.to_vec();
+        let mut degx: Vec<usize> = deg[..(n - 1)].to_vec();
         let degn = x.count_ones() as usize;
         degx.push(degn);
         let mut xw = BitVec::from_bitslice(x.view_bits::<Msb0>());
@@ -294,6 +298,7 @@ impl Extender {
 
     /* extend from n to n+1 -- version for general graphs */
     // 2314
+    #[allow(clippy::too_many_arguments)]
     pub fn genextend(
         &mut self,
         g: &mut graph::Graph,
@@ -304,7 +309,7 @@ impl Extender {
         xlb: usize,
         xub: usize,
         ecount: &mut [usize],
-        mut data: Vec<LevelData>,
+        data: &mut Vec<LevelData>,
     ) {
         let mut xlb = xlb;
 
@@ -388,20 +393,33 @@ impl Extender {
                 if (dlow & !x) != 0 {
                     continue;
                 }
-                let mut rigid = xc > dmax + 1 || (xc == dmax + 1 && (x & d) == 0);
-                if self.accept1(g, x, &mut gx, deg, &mut rigid, &mut data[n])
+                if nx as isize == self.splitlevel {
+                    todo!();
+                }
+
+                let mut degx = deg.to_vec();
+                degx.push(0);
+                if data[nx].edge_count != ne + xc || data[nx].dmax != xc {
+                    data[nx].xbnds(&self.env, nx, ne + xc, xc);
+                }
+                let xlbx = data[nx].xlb;
+                let xubx = data[nx].xub;
+                let mut rigidx = false;
+                if self.accept1(g, x, &mut gx, deg, &mut rigidx, &mut data[n])
                     && (self.connec == 0
                         || (self.connec == 1 && gx.isconnected())
                         || (self.connec == 2 && gx.isbiconnected()))
                 {
-                    ecount[ne + xc] += 1;
-                    println!(
-                        "{}",
-                        if self.canonise {
-                            gx.canonise().to_graph6()
-                        } else {
-                            gx.to_graph6()
-                        }
+                    self.genextend(
+                        &mut gx,
+                        nx,
+                        &mut degx,
+                        ne + xc,
+                        rigidx,
+                        xlbx,
+                        xubx,
+                        ecount,
+                        data,
                     );
                 }
             }

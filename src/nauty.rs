@@ -520,6 +520,7 @@ impl NautyEnv {
             firstcode: vec![0; n + 2],
             firsttc: vec![0; n + 2],
             canoncode: vec![0; n + 2],
+            workspace: vec![bitvec![usize, Msb0; 0; n]; 50],
             ..Default::default()
         }
     }
@@ -727,7 +728,7 @@ fn firstpathnode_nest(
         let loc_tcel = maketargetcell(&g_arg, partition, tc_level, None);
         stats.tctotal += loc_tcel.len();
         nauty_env.firsttc[level] = loc_tcel.first_lab_index as isize;
-        tcell = loc_tcel.to_set(n);
+        tcell = loc_tcel.to_set();
         tcel = Some(loc_tcel);
     } else {
         nauty_env.firsttc[level] = -1;
@@ -901,7 +902,7 @@ fn othernode(
             tcel = maketargetcell(&g_arg, &mut partition, tc_level, None);
         }
         stats.tctotal += tcel.len();
-        tcell = tcel.to_set(n);
+        tcell = tcel.to_set();
     }
     if let Some(_usernodeproc) = options.usernodeproc {
         todo!()
