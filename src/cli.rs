@@ -61,6 +61,8 @@ pub struct GengCli {
     pub splitlevinc: Option<isize>,
     // diff with original geng
     #[arg(long)]
+    pub mine: Option<usize>,
+    #[arg(long)]
     pub maxe: Option<usize>,
     #[arg(long)]
     pub r#mod: Option<usize>,

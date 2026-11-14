@@ -37,7 +37,7 @@ pub struct LevelData {
 }
 
 pub fn xnextbit(i: usize) -> usize {
-    size_of::<usize>() - 1 - i.leading_zeros() as usize
+    usize::BITS as usize - 1 - i.leading_zeros() as usize
 }
 
 fn arith(a: usize, b: usize, c: usize) -> usize {
@@ -71,8 +71,13 @@ impl LevelData {
                 ncj = arith(ncj, n - j + 1, j);
                 nxsets += ncj;
             }
-            let mut d = Self::default();
-            d.xlb = usize::MAX;
+            let mut d = Self {
+                edge_count: usize::MAX,
+                dmax: usize::MAX,
+                xlb: usize::MAX,
+                xub: usize::MAX,
+                ..Self::default()
+            };
 
             if restricted {
                 d.xorb = Vec::with_capacity(nxsets);
@@ -191,9 +196,7 @@ impl UserAutomProc for LevelData {
         let xset = |i: usize| x_set_card[i].set;
 
         if count == 1 {
-            for i in lo..hi {
-                xorb[i] = i;
-            }
+            *xorb = (lo..hi).collect();
         }
         let mut moved = 0;
         for i in 0..n {

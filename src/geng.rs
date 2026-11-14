@@ -175,7 +175,7 @@ impl Extender {
         let n = g.n();
         let nx = n + 1;
         *gx = Graph::disjoint_union(g, &Graph::one());
-        let mut degx: Vec<usize> = deg[..(n - 1)].to_vec();
+        let mut degx: Vec<usize> = deg.to_vec();
         let degn = x.count_ones() as usize;
         degx.push(degn);
         let mut xw = BitVec::from_bitslice(x.view_bits::<Msb0>());
@@ -404,8 +404,13 @@ impl Extender {
                 }
                 let xlbx = data[nx].xlb;
                 let xubx = data[nx].xub;
+                if xlbx > xubx {
+                    continue;
+                }
+                data[nx].lo = data[nx].xstart[xlbx];
+                data[nx].hi = data[nx].xstart[xubx + 1];
                 let mut rigidx = false;
-                if self.accept1(g, x, &mut gx, deg, &mut rigidx, &mut data[n])
+                if self.accept1(g, x, &mut gx, deg, &mut rigidx, &mut data[nx])
                     && (self.connec == 0
                         || (self.connec == 1 && gx.isconnected())
                         || (self.connec == 2 && gx.isbiconnected()))

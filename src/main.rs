@@ -78,15 +78,11 @@ fn main() {
         connec = 0;
     }
     if maxn == 1 {
-        ecount[0] += 1;
-        println!("{}", Graph::one().to_graph6());
+        if args.res.is_none() && connec < 2 {
+            ecount[0] += 1;
+            println!("{}", Graph::one().to_graph6());
+        }
     } else {
-        let env = Env {
-            maxn: 2,
-            maxe: 1,
-            mine: 0,
-            maxdeg: 1,
-        };
         let mut sparse = args.bipartite || args.squarefree || args.trianglefree || args.savemem;
         if maxn > 28 || maxn + 4 > 8 * 64usize {
             args.savemem = true;
@@ -117,10 +113,15 @@ fn main() {
             splitlevel = -1;
         }
         let data_1 = &mut data[1];
+        let env = Env {
+            maxn,
+            maxe,
+            mine: args.mine.unwrap_or(0),
+            maxdeg: args.maxdeg.unwrap_or(MAXN),
+        };
         data_1.xbnds(&env, 1, 0, 0);
         let xlb = data_1.xlb;
         let xub = data_1.xub;
-
         let mut extender = Extender {
             maxn,
             mindeg,
