@@ -7,10 +7,12 @@ use crate::{
     },
     nauty::{
         Set, SetTrait, VecMap, bitvec_from_closure, bitvec_from_f,
-        partition_nest::partition::Partition, u32_to_bitvec,
+        partition_nest::{PartitionNest, partition::Partition},
+        u32_to_bitvec,
     },
 };
 use bitvec::{bitvec, order::Msb0, vec::BitVec};
+use itertools::Itertools;
 
 #[derive(Default, PartialEq, Debug, Clone)]
 pub struct Graph(pub Vec<BitVec<usize, Msb0>>);
@@ -105,6 +107,10 @@ impl Graph {
 
     pub fn deg(&self, i: usize) -> usize {
         self.0[i].count_ones()
+    }
+
+    pub fn degs_partition_nest(&self) -> PartitionNest {
+        PartitionNest::from_deg(&(0..self.n()).map(|i| self.deg(i)).collect_vec())
     }
 
     pub fn get(&self, i: usize) -> &Set {

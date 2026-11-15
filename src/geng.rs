@@ -96,7 +96,7 @@ impl Extender {
         {
             return None;
         }
-        let nest = PartitionNest::from_deg(&deg);
+        let nest = gx.degs_partition_nest();
         let mut active = Set::zeros(nx);
         active.set(0, true);
         if let Some(&extra_zero_index) = nest.first_extra_zero() {
@@ -152,7 +152,6 @@ impl Extender {
         let nx = n + 1;
         let mut gx = g.clone();
         gx.push(Set::from_sym_usize(x, nx));
-        let degx = (0..nx).map(|i| gx.deg(i)).collect_vec();
         if self.args.k4free && gx.hask4() {
             return None;
         }
@@ -171,7 +170,7 @@ impl Extender {
             let gcan = self.args.canonise.then(|| gx.canonise());
             return Some((gx, gcan));
         }
-        let mut nest = PartitionNest::from_deg(&degx);
+        let mut nest = gx.degs_partition_nest();
         let mut active = Set::zeros(nx);
         active.set(0, true);
         match nest.first_extra_zero() {
