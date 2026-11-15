@@ -76,7 +76,7 @@ impl Extender {
     // 1711
     fn accept1(
         &self,
-        g: &mut Graph,
+        g: &Graph,
         x: usize,
         deg: &mut Vec<usize>,
         data: &mut LevelData,
