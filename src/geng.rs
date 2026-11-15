@@ -76,13 +76,7 @@ pub struct Extender {
 impl Extender {
     /* decide if n in theta(g+x) -  version for n+1 < maxn */
     // 1711
-    fn accept1(
-        &self,
-        g: &Graph,
-        x: usize,
-        deg: &mut Vec<usize>,
-        data: &mut LevelData,
-    ) -> Option<(Graph, bool)> {
+    fn accept1(&self, g: &Graph, x: usize, data: &mut LevelData) -> Option<(Graph, bool)> {
         let n = g.n();
         let nx = n + 1;
         let mut gx = g.clone();
@@ -264,7 +258,7 @@ impl Extender {
     pub fn genextend(
         &mut self,
         g: &mut graph::Graph,
-        mut deg: Vec<usize>,
+        deg: Vec<usize>,
         ne: usize,
         rigid: bool,
         xlb: usize,
@@ -273,6 +267,7 @@ impl Extender {
         data: &mut Vec<LevelData>,
     ) {
         let n = g.n();
+        let deg = (0..n).map(|i| g.deg(i)).collect_vec();
         let mut xlb = xlb;
         self.nodes[n] += 1;
         let nx = n + 1;
@@ -364,7 +359,7 @@ impl Extender {
                 }
                 data[nx].lo = data[nx].xstart[xlbx];
                 data[nx].hi = data[nx].xstart[xubx + 1];
-                if let Some((mut gx, rigidx)) = self.accept1(g, x, &mut degx, &mut data[nx])
+                if let Some((mut gx, rigidx)) = self.accept1(g, x, &mut data[nx])
                     && (self.connec == 0
                         || (self.connec == 1 && gx.isconnected())
                         || (self.connec == 2 && gx.isbiconnected()))
