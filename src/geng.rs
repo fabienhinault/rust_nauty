@@ -85,22 +85,9 @@ impl Extender {
     ) -> Option<(Graph, bool)> {
         let n = g.n();
         let nx = n + 1;
-        let mut gx = Graph::disjoint_union(g, &Graph::one());
-        let degn = x.count_ones() as usize;
-        if deg.len() == n {
-            deg.push(degn);
-        } else {
-            deg[n] = degn;
-        }
-        let mut xw: BitVec<usize, Msb0> = BitVec::from_bitslice(x.view_bits::<Msb0>());
-        while xw.any() {
-            let i = xw.leading_zeros();
-            let ii = xw.len() - 1 - i;
-            xw.set(i, false);
-            gx[ii].set(n, true);
-            gx[n].set(ii, true);
-            deg[ii] += 1;
-        }
+        let mut gx = g.clone();
+        gx.push(Set::from_sym_usize(x, nx));
+        let deg = (0..nx).map(|i| gx.deg(i)).collect_vec();
         if self.args.k4free && gx.hask4() {
             return None;
         }
@@ -115,7 +102,7 @@ impl Extender {
         {
             return None;
         }
-        let nest = PartitionNest::from_deg(deg);
+        let nest = PartitionNest::from_deg(&deg);
         let mut active = Set::zeros(nx);
         active.set(0, true);
         if let Some(&extra_zero_index) = nest.first_extra_zero() {
@@ -164,7 +151,6 @@ impl Extender {
         &self,
         g: &Graph,
         x: usize,
-        deg: &mut [usize],
         nuniq: bool,
         data: &mut LevelData,
     ) -> Option<(Graph, Option<Graph>)> {
@@ -330,7 +316,6 @@ impl Extender {
                 if let Some((gx, _)) = self.accept2(
                     g,
                     x,
-                    &mut deg,
                     xc > dmax + 1 || (xc == dmax + 1 && (x & d) == 0),
                     &mut data[n],
                 ) && (self.connec == 0
