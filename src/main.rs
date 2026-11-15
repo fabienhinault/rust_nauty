@@ -132,10 +132,10 @@ fn main() {
             splitlevel,
             env: env.clone(),
         };
-        let mut deg = vec![0];
+        let deg = vec![0];
         let mut g = Graph::no_edge(1);
         /* counts by number of edges */
         let mut ecount: Vec<usize> = vec![0; 1 + maxn * (maxn - 1) / 2];
-        extender.genextend(&mut g, &mut deg, 0, true, xlb, xub, &mut ecount, &mut data);
+        extender.genextend(&mut g, deg, 0, true, xlb, xub, &mut ecount, &mut data);
     }
 }
