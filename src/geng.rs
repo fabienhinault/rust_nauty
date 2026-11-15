@@ -258,7 +258,6 @@ impl Extender {
     pub fn genextend(
         &mut self,
         g: &mut graph::Graph,
-        deg: Vec<usize>,
         ne: usize,
         rigid: bool,
         xlb: usize,
@@ -364,7 +363,7 @@ impl Extender {
                         || (self.connec == 1 && gx.isconnected())
                         || (self.connec == 2 && gx.isbiconnected()))
                 {
-                    self.genextend(&mut gx, degx, ne + xc, rigidx, xlbx, xubx, ecount, data);
+                    self.genextend(&mut gx, ne + xc, rigidx, xlbx, xubx, ecount, data);
                 }
             }
         }
