@@ -185,7 +185,7 @@ impl Extender {
             xw.set(i, false);
             gx[ii].set(n, true);
             gx[n].set(ii, true);
-            deg[ii] += 1;
+            degx[ii] += 1;
         }
         if self.args.k4free && gx.hask4() {
             return false;

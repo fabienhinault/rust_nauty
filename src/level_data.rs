@@ -196,7 +196,7 @@ impl UserAutomProc for LevelData {
         let xset = |i: usize| x_set_card[i].set;
 
         if count == 1 {
-            *xorb = (lo..hi).collect();
+            *xorb = (0..hi).collect();
         }
         let mut moved = 0;
         for i in 0..n {
