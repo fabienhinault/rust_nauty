@@ -345,9 +345,6 @@ impl Extender {
                 if nx as isize == self.splitlevel {
                     todo!();
                 }
-
-                let mut degx = deg.to_vec();
-                degx.push(0);
                 if data[nx].edge_count != ne + xc || data[nx].dmax != xc {
                     data[nx].xbnds(&self.env, nx, ne + xc, xc);
                 }
