@@ -302,7 +302,6 @@ impl Extender {
     pub fn genextend(
         &mut self,
         g: &mut graph::Graph,
-        n: usize,
         deg: &mut Vec<usize>,
         ne: usize,
         rigid: bool,
@@ -311,8 +310,8 @@ impl Extender {
         ecount: &mut [usize],
         data: &mut Vec<LevelData>,
     ) {
+        let n = g.n();
         let mut xlb = xlb;
-
         self.nodes[n] += 1;
         let nx = n + 1;
         let dmax = deg[n - 1];
@@ -417,7 +416,6 @@ impl Extender {
                 {
                     self.genextend(
                         &mut gx,
-                        nx,
                         &mut degx,
                         ne + xc,
                         rigidx,

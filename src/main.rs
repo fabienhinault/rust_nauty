@@ -136,16 +136,6 @@ fn main() {
         let mut g = Graph::no_edge(1);
         /* counts by number of edges */
         let mut ecount: Vec<usize> = vec![0; 1 + maxn * (maxn - 1) / 2];
-        extender.genextend(
-            &mut g,
-            1,
-            &mut deg,
-            0,
-            true,
-            xlb,
-            xub,
-            &mut ecount,
-            &mut data,
-        );
+        extender.genextend(&mut g, &mut deg, 0, true, xlb, xub, &mut ecount, &mut data);
     }
 }
