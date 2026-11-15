@@ -162,15 +162,13 @@ impl Extender {
         &self,
         g: &mut graph::Graph,
         x: usize,
-        gx: &mut graph::Graph,
-        gcan: &mut graph::Graph,
         deg: &mut [usize],
         nuniq: bool,
         data: &mut LevelData,
-    ) -> bool {
+    ) -> Option<(Graph, Option<Graph>)> {
         let n = g.n();
         let nx = n + 1;
-        *gx = Graph::disjoint_union(g, &Graph::one());
+        let mut gx = Graph::disjoint_union(g, &Graph::one());
         let mut degx: Vec<usize> = deg.to_vec();
         let degn = x.count_ones() as usize;
         degx.push(degn);
@@ -184,24 +182,22 @@ impl Extender {
             degx[ii] += 1;
         }
         if self.args.k4free && gx.hask4() {
-            return false;
+            return None;
         }
         if self.args.clawfree && gx.hasclaw() {
-            return false;
+            return None;
         }
         if self.args.connec2 && n + 2 == self.maxn && !g.isconnected() {
-            return false;
+            return None;
         }
         if ((self.args.connec2 && n + 2 < self.maxn) || (self.args.connec1 && n + 2 <= self.maxn))
             && gx.connpreprune(&self.args)
         {
-            return false;
+            return None;
         }
         if nuniq {
-            if self.args.canonise {
-                *gcan = gx.canonise();
-            }
-            return true;
+            let gcan = self.args.canonise.then(|| gx.canonise());
+            return Some((gx, gcan));
         }
         let mut nest = PartitionNest::from_deg(&degx);
         let mut active = Set::zeros(nx);
@@ -210,15 +206,13 @@ impl Extender {
             None => {
                 let invar = gx.distinvar();
                 match invar {
-                    None => return false,
+                    None => return None,
                     Some(invar) => {
                         let j0 = nest.apply_distance_invariant(0, &invar);
                         if j0 > 0 {
                             if j0 == n {
-                                if self.args.canonise {
-                                    *gcan = gx.canonise();
-                                }
-                                return true;
+                                let gcan = self.args.canonise.then(|| gx.canonise());
+                                return Some((gx, gcan));
                             }
                             active.set(j0, true);
                         }
@@ -241,10 +235,8 @@ impl Extender {
                 let j0 = nest.apply_distance_invariant(extra_zero_index + 1, &gvs);
                 if j0 > 0 {
                     if j0 == n {
-                        if self.args.canonise {
-                            *gcan = gx.canonise();
-                        }
-                        return true;
+                        let gcan = self.args.canonise.then(|| gx.canonise());
+                        return Some((gx, gcan));
                     }
                     active.set(j0, true);
                 }
@@ -252,16 +244,14 @@ impl Extender {
         }
         let mut code = 0;
         let mut partition = Partition { nest, level: 0 };
-        refinex(gx, &mut partition, &mut active, false, &mut code);
+        refinex(&mut gx, &mut partition, &mut active, false, &mut code);
         if code < 0 {
-            return false;
+            return None;
         }
         let cheapacc: bool = partition.cheapacc(code);
         if cheapacc {
-            if self.args.canonise {
-                *gcan = gx.canonise();
-            }
-            return true;
+            let gcan = self.args.canonise.then(|| gx.canonise());
+            return Some((gx, gcan));
         }
 
         let mut options: OptionBlk = OptionBlk::default();
@@ -273,7 +263,7 @@ impl Extender {
         let mut h: Graph = Graph::no_edge(nx);
         let mut stats: StatBlk = StatBlk::default();
         let _ = nauty(
-            gx,
+            &mut gx,
             &mut partition.nest,
             Some(&active),
             &mut orbits,
@@ -283,12 +273,10 @@ impl Extender {
         );
         options.userautomproc = None;
         if orbits[partition[n]] == orbits[n] {
-            if self.args.canonise {
-                *gcan = gx.canonise();
-            }
-            true
+            let gcan = self.args.canonise.then(|| gx.canonise());
+            Some((gx, gcan))
         } else {
-            false
+            None
         }
     }
 
@@ -335,8 +323,6 @@ impl Extender {
         let imax = data[n].xstart[xub + 1];
         //let x_set_card = &mut data.x_set_card;
         let xorb = data[n].xorb.clone();
-        let mut gx: graph::Graph = graph::Graph::default();
-        let mut gcan: graph::Graph = graph::Graph::default();
         if nx == self.maxn {
             for i in imin..imax {
                 if !rigid && xorb[i] != i {
@@ -350,11 +336,9 @@ impl Extender {
                 if (dlow & !x) != 0 {
                     continue;
                 }
-                if self.accept2(
+                if let Some((gx, _)) = self.accept2(
                     g,
                     x,
-                    &mut gx,
-                    &mut gcan,
                     &mut deg,
                     xc > dmax + 1 || (xc == dmax + 1 && (x & d) == 0),
                     &mut data[n],
