@@ -3,7 +3,7 @@ use crate::{
     nauty::{Set, UserAutomProc},
 };
 //use bitvec::{order::Msb0, vec::BitVec};
-use std::{cell::RefCell, cmp::min, rc::Rc};
+use std::{cell::RefCell, cmp::min, ops::ControlFlow, rc::Rc};
 
 const WORD_SIZE: usize = size_of::<usize>();
 const MAXN: usize = WORD_SIZE;
@@ -64,60 +64,10 @@ impl LevelData {
         let mut data: Vec<Self> = Vec::with_capacity(maxn);
         data.push(LevelData::default());
         for n in 1..maxn {
-            let nn = min(n, maxdeg);
-            let mut ncj: usize = 1;
-            let mut nxsets: usize = 1;
-            for j in 1..=nn {
-                ncj = arith(ncj, n - j + 1, j);
-                nxsets += ncj;
-            }
-            let mut d = Self {
-                edge_count: usize::MAX,
-                dmax: usize::MAX,
-                xlb: usize::MAX,
-                xub: usize::MAX,
-                ..Self::default()
+            let d = match Self::try_new(restricted, maxdeg, n) {
+                Some(value) => value,
+                None => continue,
             };
-
-            if restricted {
-                d.xorb = Vec::with_capacity(nxsets);
-                d.xx = Vec::with_capacity(nxsets);
-                continue;
-            }
-            let tttn: usize = 1 << n;
-            d.x_set_card = Vec::with_capacity(nxsets);
-            d.xinv = vec![None; tttn];
-            d.xorb = Vec::with_capacity(nxsets);
-
-            let ilast = if n == WORD_SIZE {
-                usize::MAX
-            } else {
-                (1 << n) - 1
-            };
-            for i in 0..=ilast {
-                let h: usize = i.count_ones() as usize;
-                if h <= maxdeg {
-                    d.x_set_card.push(SetCard { card: h, set: i });
-                }
-            }
-
-            if d.x_set_card.len() != nxsets {
-                panic!();
-            }
-
-            d.x_set_card.sort();
-
-            for i in 0..nxsets {
-                d.xinv[d.x_set_card[i].set] = Some(i);
-            }
-
-            d.xstart[0] = 0;
-            for i in 1..nxsets {
-                if d.x_set_card[i].card > d.x_set_card[i - 1].card {
-                    d.xstart[d.xcard(i) as usize] = i;
-                }
-            }
-            d.xstart[(d.xcard(nxsets - 1) + 1) as usize] = nxsets;
             data.push(d);
         }
 
@@ -170,8 +120,59 @@ impl LevelData {
         self.xlb = xlb;
         self.xub = xub;
     }
-}
 
+    fn try_new(restricted: bool, maxdeg: usize, n: usize) -> Option<Self> {
+        let nn = min(n, maxdeg);
+        let mut ncj: usize = 1;
+        let mut nxsets: usize = 1;
+        for j in 1..=nn {
+            ncj = arith(ncj, n - j + 1, j);
+            nxsets += ncj;
+        }
+        let mut d = Self {
+            edge_count: usize::MAX,
+            dmax: usize::MAX,
+            xlb: usize::MAX,
+            xub: usize::MAX,
+            ..Self::default()
+        };
+        if restricted {
+            d.xorb = Vec::with_capacity(nxsets);
+            d.xx = Vec::with_capacity(nxsets);
+            return None;
+        }
+        let tttn: usize = 1 << n;
+        d.x_set_card = Vec::with_capacity(nxsets);
+        d.xinv = vec![None; tttn];
+        d.xorb = Vec::with_capacity(nxsets);
+        let ilast = if n == WORD_SIZE {
+            usize::MAX
+        } else {
+            (1 << n) - 1
+        };
+        for i in 0..=ilast {
+            let h: usize = i.count_ones() as usize;
+            if h <= maxdeg {
+                d.x_set_card.push(SetCard { card: h, set: i });
+            }
+        }
+        if d.x_set_card.len() != nxsets {
+            panic!();
+        }
+        d.x_set_card.sort();
+        for i in 0..nxsets {
+            d.xinv[d.x_set_card[i].set] = Some(i);
+        }
+        d.xstart[0] = 0;
+        for i in 1..nxsets {
+            if d.x_set_card[i].card > d.x_set_card[i - 1].card {
+                d.xstart[d.xcard(i)] = i;
+            }
+        }
+        d.xstart[(d.xcard(nxsets - 1) + 1)] = nxsets;
+        Some(d)
+    }
+}
 impl UserAutomProc for LevelData {
     /* form orbits on powerset of VG
     called by nauty;  operates on data[n] */

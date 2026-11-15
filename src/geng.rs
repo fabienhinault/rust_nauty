@@ -160,7 +160,7 @@ impl Extender {
     #[allow(clippy::too_many_arguments)]
     fn accept2(
         &self,
-        g: &mut graph::Graph,
+        g: &Graph,
         x: usize,
         deg: &mut [usize],
         nuniq: bool,
@@ -321,7 +321,6 @@ impl Extender {
         }
         let imin = data[n].xstart[xlb];
         let imax = data[n].xstart[xub + 1];
-        //let x_set_card = &mut data.x_set_card;
         let xorb = data[n].xorb.clone();
         if nx == self.maxn {
             for i in imin..imax {
