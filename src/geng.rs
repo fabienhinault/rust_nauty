@@ -76,16 +76,14 @@ impl Extender {
     // 1711
     fn accept1(
         &self,
-        g: &mut graph::Graph,
+        g: &mut Graph,
         x: usize,
-        gx: &mut graph::Graph,
         deg: &mut Vec<usize>,
-        rigid: &mut bool,
         data: &mut LevelData,
-    ) -> bool {
+    ) -> Option<(Graph, bool)> {
         let n = g.n();
         let nx = n + 1;
-        *gx = Graph::disjoint_union(g, &Graph::one());
+        let mut gx = Graph::disjoint_union(g, &Graph::one());
         let degn = x.count_ones() as usize;
         if deg.len() == n {
             deg.push(degn);
@@ -102,18 +100,18 @@ impl Extender {
             deg[ii] += 1;
         }
         if self.args.k4free && gx.hask4() {
-            return false;
+            return None;
         }
         if self.args.clawfree && gx.hasclaw() {
-            return false;
+            return None;
         }
         if self.args.connec2 && n + 2 == self.maxn && !g.isconnected() {
-            return false;
+            return None;
         }
         if ((self.args.connec2 && n + 2 < self.maxn) || (self.args.connec1 && n + 2 <= self.maxn))
             && gx.connpreprune(&self.args)
         {
-            return false;
+            return None;
         }
         let nest = PartitionNest::from_deg(deg);
         let mut active = Set::zeros(nx);
@@ -125,11 +123,10 @@ impl Extender {
         let mut partition = Partition { nest, level: 0 };
         refinex(g, &mut partition, &mut active, false, &mut code);
         if code < 0 {
-            return false;
+            return None;
         }
         if partition.is_discrete() {
-            *rigid = true;
-            return true;
+            return Some((gx, true));
         }
         let mut options: OptionBlk = OptionBlk {
             getcanon: 1,
@@ -142,7 +139,7 @@ impl Extender {
         let mut h: Graph = Graph::no_edge(nx);
         let mut stats: StatBlk = StatBlk::default();
         let _ = nauty(
-            gx,
+            &mut gx,
             &mut partition.nest,
             Some(&active),
             &mut orbits,
@@ -152,10 +149,9 @@ impl Extender {
         );
         options.userautomproc = None;
         if orbits[partition[n]] == orbits[n] {
-            *rigid = stats.numorbits == nx;
-            true
+            Some((gx, stats.numorbits == nx))
         } else {
-            false
+            None
         }
     }
 
@@ -408,8 +404,7 @@ impl Extender {
                 }
                 data[nx].lo = data[nx].xstart[xlbx];
                 data[nx].hi = data[nx].xstart[xubx + 1];
-                let mut rigidx = false;
-                if self.accept1(g, x, &mut gx, &mut deg, &mut rigidx, &mut data[nx])
+                if let Some((mut gx, rigidx)) = self.accept1(g, x, &mut deg, &mut data[nx])
                     && (self.connec == 0
                         || (self.connec == 1 && gx.isconnected())
                         || (self.connec == 2 && gx.isbiconnected()))
