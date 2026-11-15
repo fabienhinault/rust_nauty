@@ -1,3 +1,5 @@
+use std::assert_eq;
+
 use crate::{
     cli::GengCli,
     env::Env,
@@ -169,20 +171,8 @@ impl Extender {
         let n = g.n();
         let nx = n + 1;
         let mut gx = g.clone();
-        let xw = BitVec::from_bitslice(x.view_bits::<Msb0>());
-        gx.push(xw);
-        let mut degx: Vec<usize> = deg.to_vec();
-        let degn = x.count_ones() as usize;
-        degx.push(degn);
-        let mut xw = BitVec::from_bitslice(x.view_bits::<Msb0>());
-        while xw.any() {
-            let i = xw.leading_zeros();
-            let ii = xw.len() - 1 - i;
-            xw.set(i, false);
-            gx[ii].set(n, true);
-            gx[n].set(ii, true);
-            degx[ii] += 1;
-        }
+        gx.push(Set::from_sym_usize(x, nx));
+        let degx = (0..nx).map(|i| gx.deg(i)).collect_vec();
         if self.args.k4free && gx.hask4() {
             return None;
         }
@@ -389,7 +379,7 @@ impl Extender {
                 }
                 data[nx].lo = data[nx].xstart[xlbx];
                 data[nx].hi = data[nx].xstart[xubx + 1];
-                if let Some((mut gx, rigidx)) = self.accept1(g, x, &mut deg, &mut data[nx])
+                if let Some((mut gx, rigidx)) = self.accept1(g, x, &mut degx, &mut data[nx])
                     && (self.connec == 0
                         || (self.connec == 1 && gx.isconnected())
                         || (self.connec == 2 && gx.isbiconnected()))

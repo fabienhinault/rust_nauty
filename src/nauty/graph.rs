@@ -58,11 +58,12 @@ impl Graph {
         )
     }
 
-    pub fn push(&mut self, set: BitVec<usize, Msb0>) {
-        set[1..]
-            .iter()
+    pub fn push(&mut self, mut set: BitVec<usize, Msb0>) {
+        set.iter()
             .zip(self.0.iter_mut())
             .for_each(|(b, row)| row.push(*b));
+        set.set(self.n(), false);
+        set.truncate(self.n() + 1);
         self.0.push(set);
     }
 
@@ -324,5 +325,20 @@ impl Graph {
             d += 1;
         }
         Some(invar)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::assert_eq;
+
+    use super::*;
+    use bitvec::bitvec;
+
+    #[test]
+    fn test_push() {
+        let mut g = Graph::no_edge(2);
+        g.push(bitvec![usize, Msb0; 1, 0, 0]);
+        assert_eq!(g, Graph::from_edges(3, &[(0, 2)]));
     }
 }

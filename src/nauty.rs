@@ -190,6 +190,7 @@ pub trait SetTrait: Sized {
     fn zeros(n: usize) -> Self;
     fn ones(n: usize) -> Self;
     fn one(n: usize, index: usize) -> Self;
+    fn from_sym_usize(x: usize, size: usize) -> Self;
     fn add_one(&mut self, index: usize);
     fn remove_one(&mut self, index: usize);
     fn except_one(&self, index: usize) -> Self;
@@ -243,6 +244,13 @@ impl SetTrait for Set {
         let mut s = Self::zeros(n);
         s.set(index, true);
         s
+    }
+
+    fn from_sym_usize(x: usize, size: usize) -> Self {
+        let mut v = x.view_bits::<Msb0>().to_bitvec();
+        v.reverse();
+        v.truncate(size);
+        v
     }
 
     fn filter(&self, other: &Self) -> Self {
