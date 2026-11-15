@@ -81,7 +81,6 @@ impl Extender {
         let nx = n + 1;
         let mut gx = g.clone();
         gx.push(Set::from_sym_usize(x, nx));
-        let deg = (0..nx).map(|i| gx.deg(i)).collect_vec();
         if self.args.k4free && gx.hask4() {
             return None;
         }
@@ -104,7 +103,7 @@ impl Extender {
         }
         let mut code = 0;
         let mut partition = Partition { nest, level: 0 };
-        refinex(g, &mut partition, &mut active, false, &mut code);
+        refinex(&gx, &mut partition, &mut active, false, &mut code);
         if code < 0 {
             return None;
         }
