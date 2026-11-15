@@ -168,7 +168,9 @@ impl Extender {
     ) -> Option<(Graph, Option<Graph>)> {
         let n = g.n();
         let nx = n + 1;
-        let mut gx = Graph::disjoint_union(g, &Graph::one());
+        let mut gx = g.clone();
+        let xw = BitVec::from_bitslice(x.view_bits::<Msb0>());
+        gx.push(xw);
         let mut degx: Vec<usize> = deg.to_vec();
         let degn = x.count_ones() as usize;
         degx.push(degn);
