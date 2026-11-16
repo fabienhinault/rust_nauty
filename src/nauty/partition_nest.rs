@@ -218,6 +218,7 @@ mod test {
     #[test_case(LAB, PTN, 1, &[&[4, 6, 2, 0], &[8, 7, 5, 9], &[3, 1]])]
     #[test_case(LAB, PTN, 2, &[&[4, 6, 2, 0], &[8], &[7, 5, 9], &[3], &[1]])]
     #[test_case(LAB, PTN, 3, &[&[4, 6], &[2, 0], &[8], &[7, 5, 9], &[3], &[1]])]
+    #[test_case(&[1, 0, 2], &[0, NAUTY_INFINITY, 0], 1, &[&[1], &[0, 2]])]
     fn test_partition(lab: &[usize], ptn: &[usize], level: usize, expected: &[&[usize]]) {
         assert_eq!(
             PartitionNest::new(Vec::from(lab), Vec::from(ptn)).partition_vec(level),
