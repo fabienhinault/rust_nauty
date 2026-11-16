@@ -769,9 +769,9 @@ fn firstpathnode_nest(
     /* use the elements of the target cell to produce the children: */
     let mut index = 0;
     let mut _childcount = 0;
-    let cell_lab: Vec<usize> = tcel.as_ref().map(Cell::to_sorted_vec).unwrap_or(vec![]);
+    let cell_lab: Vec<usize> = tcel.as_ref().map(Cell::to_sorted_vec).unwrap_or_default();
     let tv1 = cell_lab[0];
-    let tc = cell_lab[0];
+    let tc = tcel.map(|c| c.first_lab_index).unwrap_or(usize::MAX);
     partition.advance();
     for tv in cell_lab.iter().copied() {
         if nauty_env.orbits[tv] == tv {

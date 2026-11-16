@@ -114,6 +114,7 @@ impl Extender {
             getcanon: 1,
             defaultptn: false,
             userautomproc: Some(data),
+            tc_level: 100,
             ..Default::default()
         };
         active = BitVec::zeros(nx);

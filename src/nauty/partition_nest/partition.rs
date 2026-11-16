@@ -367,4 +367,17 @@ mod test {
     fn test_cheapacc(partition: Partition, code: isize, expected: bool) {
         assert_eq!(partition.cheapacc(code), expected);
     }
+
+    #[test]
+    fn test_breakout() {
+        let mut p = Partition::new(
+            PartitionNest::new(vec![1, 0, 2], vec![0, NAUTY_INFINITY, 0]),
+            2,
+        );
+        p.breakout(1, 0);
+        assert_eq!(
+            p,
+            Partition::new(PartitionNest::new(vec![1, 0, 2], vec![0, 2, 0]), 2,)
+        );
+    }
 }
