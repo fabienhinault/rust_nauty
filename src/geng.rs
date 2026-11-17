@@ -271,16 +271,7 @@ impl Extender {
         let nx = n + 1;
         let dmax = deg[n - 1];
         let dcrit: Option<usize> = (self.mindeg + n).checked_sub(self.maxn);
-        let mut d: usize = 0;
-        let mut dlow = 0;
-        for i in 0..n {
-            if deg[i] == dmax {
-                d |= xbit(i);
-            }
-            if Some(true) == dcrit.map(|dcrit| dcrit == deg[i]) {
-                dlow |= xbit(i);
-            }
-        }
+        let (d, dlow) = d_dlow(n, deg, dmax, dcrit);
         if xlb == dmax && d.count_ones() as usize + dmax > n {
             xlb += 1;
         }
@@ -364,6 +355,20 @@ impl Extender {
             }
         }
     }
+}
+
+fn d_dlow(n: usize, deg: Vec<usize>, dmax: usize, dcrit: Option<usize>) -> (usize, usize) {
+    let mut d: usize = 0;
+    let mut dlow = 0;
+    for i in 0..n {
+        if deg[i] == dmax {
+            d |= xbit(i);
+        }
+        if Some(true) == dcrit.map(|dcrit| dcrit == deg[i]) {
+            dlow |= xbit(i);
+        }
+    }
+    (d, dlow)
 }
 
 /*****************************************************************************
