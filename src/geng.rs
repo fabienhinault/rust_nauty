@@ -270,14 +270,14 @@ impl Extender {
         self.nodes[n] += 1;
         let nx = n + 1;
         let dmax = deg[n - 1];
-        let dcrit: isize = self.mindeg as isize - self.maxn as isize + n as isize;
+        let dcrit: Option<usize> = (self.mindeg + n).checked_sub(self.maxn);
         let mut d: usize = 0;
         let mut dlow = 0;
         for i in 0..n {
             if deg[i] == dmax {
                 d |= xbit(i);
             }
-            if deg[i] as isize == dcrit {
+            if Some(true) == dcrit.map(|dcrit| dcrit == deg[i]) {
                 dlow |= xbit(i);
             }
         }
