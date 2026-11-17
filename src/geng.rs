@@ -98,7 +98,7 @@ impl Extender {
         let nest = gx.degs_partition_nest();
         let mut active = Set::zeros(nx);
         active.set(0, true);
-        if let Some(&extra_zero_index) = nest.first_extra_zero() {
+        if let Some(extra_zero_index) = nest.first_extra_zero() {
             active.set(extra_zero_index + 1, true);
         }
         let mut code = 0;
@@ -190,7 +190,7 @@ impl Extender {
                     }
                 }
             }
-            Some(&extra_zero_index) => {
+            Some(extra_zero_index) => {
                 active.set(extra_zero_index + 1, true);
                 let mut vmax: Set = Set::zeros(nx);
                 for i in (extra_zero_index + 1)..nx {

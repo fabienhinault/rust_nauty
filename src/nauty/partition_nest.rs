@@ -152,8 +152,8 @@ impl PartitionNest {
         self.ptn[..self.ptn.len() - 1].iter().any(|&i| i == 0)
     }
 
-    pub fn first_extra_zero(&self) -> Option<&usize> {
-        self.ptn[..self.ptn.len() - 1].iter().find(|&&i| i == 0)
+    pub fn first_extra_zero(&self) -> Option<usize> {
+        self.ptn[..self.ptn.len() - 1].iter().position(|&i| i == 0)
     }
 
     pub(crate) fn apply_distance_invariant_alt(
@@ -195,6 +195,8 @@ impl Display for PartitionNest {
 
 #[cfg(test)]
 mod test {
+    use std::assert_eq;
+
     use super::*;
     use crate::nauty::{NAUTY_INFINITY, Set, partition_nest::partition::Partition};
     use bitvec::{bitvec, order::Msb0};
@@ -351,5 +353,13 @@ mod test {
         let actual = before.apply_distance_invariant_alt(j0_start, invar);
         assert_eq!(before, after);
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_first_extra_zero() {
+        assert_eq!(
+            PartitionNest::new(vec![0, 1, 3, 2], vec![1, 0, 1, 0]).first_extra_zero(),
+            Some(1)
+        );
     }
 }
