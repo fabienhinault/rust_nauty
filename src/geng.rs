@@ -270,7 +270,7 @@ impl Extender {
             None => return,
         };
         if nx == self.maxn {
-            self.print_leaves(stepper, ne, rigid, ecount, data);
+            stepper.print_leaves(ne, rigid, ecount, data);
         } else {
             self.extend1(stepper, ne, rigid, ecount, data, nodes, splitlevel);
         }
@@ -351,59 +351,6 @@ impl Extender {
         }
     }
 
-    fn print_leaves(
-        &self,
-        stepper: ExtendStepper,
-        ne: usize,
-        rigid: bool,
-        ecount: &mut [usize],
-        data: &mut Vec<LevelData>,
-    ) {
-        let ExtendStepper {
-            g,
-            dmax,
-            d,
-            dlow,
-            imin,
-            imax,
-            xorb,
-            ..
-        } = stepper;
-        let n = g.n();
-        for i in imin..imax {
-            if !rigid && xorb[i] != i {
-                continue;
-            }
-            let x = data[n].xset(i);
-            let xc = data[n].xcard(i);
-            if xc == dmax && (x & d) != 0 {
-                continue;
-            }
-            if (dlow & !x) != 0 {
-                continue;
-            }
-            if let Some((gx, _)) = self.accept2(
-                &g,
-                x,
-                xc > dmax + 1 || (xc == dmax + 1 && (x & d) == 0),
-                &mut data[n],
-            ) && (self.connec == 0
-                || (self.connec == 1 && gx.isconnected())
-                || (self.connec == 2 && gx.isbiconnected()))
-            {
-                ecount[ne + xc] += 1;
-                print!(
-                    "{}",
-                    if self.canonise {
-                        gx.canonise().to_graph6()
-                    } else {
-                        gx.to_graph6()
-                    }
-                );
-            }
-        }
-    }
-
     fn init_extend<'a>(
         &'a self,
         g: Graph,
@@ -452,6 +399,54 @@ struct ExtendStepper<'a> {
     imax: usize,
     xorb: Vec<usize>,
     extender: &'a Extender,
+}
+
+impl<'a> ExtendStepper<'a> {
+    fn print_leaves(self, ne: usize, rigid: bool, ecount: &mut [usize], data: &mut Vec<LevelData>) {
+        let ExtendStepper {
+            g,
+            dmax,
+            d,
+            dlow,
+            imin,
+            imax,
+            xorb,
+            extender,
+        } = self;
+        let n = g.n();
+        for i in imin..imax {
+            if !rigid && xorb[i] != i {
+                continue;
+            }
+            let x = data[n].xset(i);
+            let xc = data[n].xcard(i);
+            if xc == dmax && (x & d) != 0 {
+                continue;
+            }
+            if (dlow & !x) != 0 {
+                continue;
+            }
+            if let Some((gx, _)) = extender.accept2(
+                &g,
+                x,
+                xc > dmax + 1 || (xc == dmax + 1 && (x & d) == 0),
+                &mut data[n],
+            ) && (extender.connec == 0
+                || (extender.connec == 1 && gx.isconnected())
+                || (extender.connec == 2 && gx.isbiconnected()))
+            {
+                ecount[ne + xc] += 1;
+                print!(
+                    "{}",
+                    if extender.canonise {
+                        gx.canonise().to_graph6()
+                    } else {
+                        gx.to_graph6()
+                    }
+                );
+            }
+        }
+    }
 }
 
 fn d_dlow(n: usize, deg: Vec<usize>, dmax: usize, dcrit: Option<usize>) -> (usize, usize) {
