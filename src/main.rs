@@ -131,13 +131,12 @@ fn main() {
     data_1.xbnds(&env, 1, 0, 0);
     let xlb = data_1.xlb;
     let xub = data_1.xub;
-    let mut extender = Extender {
+    let extender = Extender {
         maxn,
         mindeg,
         connec,
         canonise: args.canonise,
         args,
-        splitlevel,
         min_splitlevel: 6,
         multiplicity,
         env: env.clone(),
@@ -146,5 +145,15 @@ fn main() {
     let g = Graph::no_edge(1);
     /* counts by number of edges */
     let mut ecount: Vec<usize> = vec![0; 1 + maxn * (maxn - 1) / 2];
-    extender.genextend(g, 0, true, xlb, xub, &mut ecount, &mut data, &mut nodes);
+    extender.genextend(
+        g,
+        0,
+        true,
+        xlb,
+        xub,
+        &mut ecount,
+        &mut data,
+        &mut nodes,
+        &mut splitlevel,
+    );
 }

@@ -62,7 +62,6 @@ pub struct Extender {
     pub connec: u8,
     pub canonise: bool,
     pub args: GengCli,
-    pub splitlevel: isize,
     pub min_splitlevel: usize,
     pub multiplicity: usize,
     pub env: Env,
@@ -252,7 +251,7 @@ impl Extender {
     // 2314
     #[allow(clippy::too_many_arguments)]
     pub fn genextend(
-        &mut self,
+        &self,
         g: graph::Graph,
         ne: usize,
         rigid: bool,
@@ -261,6 +260,7 @@ impl Extender {
         ecount: &mut [usize],
         data: &mut Vec<LevelData>,
         nodes: &mut Vec<usize>,
+        splitlevel: &mut isize,
     ) {
         let n = g.n();
         let nx = n + 1;
@@ -272,24 +272,25 @@ impl Extender {
         if nx == self.maxn {
             self.print_leaves(stepper, ne, rigid, ecount, data);
         } else {
-            self.extend1(stepper, ne, rigid, ecount, data, nodes);
+            self.extend1(stepper, ne, rigid, ecount, data, nodes, splitlevel);
         }
-        if n == self.splitlevel as usize - 1
+        if n == *splitlevel as usize - 1
             && n >= self.min_splitlevel
             && nodes[n] >= self.multiplicity
         {
-            self.splitlevel -= 1;
+            *splitlevel -= 1;
         }
     }
 
     fn extend1(
-        &mut self,
+        &self,
         stepper: ExtendStepper,
         ne: usize,
         rigid: bool,
         ecount: &mut [usize],
         data: &mut Vec<LevelData>,
         nodes: &mut Vec<usize>,
+        splitlevel: &mut isize,
     ) {
         let ExtendStepper {
             g,
@@ -317,7 +318,7 @@ impl Extender {
             if (dlow & !x) != 0 {
                 continue;
             }
-            if nx as isize == self.splitlevel {
+            if nx as isize == *splitlevel {
                 todo!();
             }
             if data[nx].edge_count != ne + xc || data[nx].dmax != xc {
@@ -335,13 +336,23 @@ impl Extender {
                     || (self.connec == 1 && gx.isconnected())
                     || (self.connec == 2 && gx.isbiconnected()))
             {
-                self.genextend(gx, ne + xc, rigidx, xlbx, xubx, ecount, data, nodes);
+                self.genextend(
+                    gx,
+                    ne + xc,
+                    rigidx,
+                    xlbx,
+                    xubx,
+                    ecount,
+                    data,
+                    nodes,
+                    splitlevel,
+                );
             }
         }
     }
 
     fn print_leaves(
-        &mut self,
+        &self,
         stepper: ExtendStepper,
         ne: usize,
         rigid: bool,
@@ -359,7 +370,6 @@ impl Extender {
             ..
         } = stepper;
         let n = g.n();
-        let nx = n + 1;
         for i in imin..imax {
             if !rigid && xorb[i] != i {
                 continue;
