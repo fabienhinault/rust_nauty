@@ -403,15 +403,6 @@ impl<'a> ExtendStepper<'a> {
         let n = self.g.n();
         let xs: Vec<usize> = (imin..imax).map(|i| data[n].xset(i)).collect_vec();
         let xcs: Vec<usize> = (imin..imax).map(|i| data[n].xcard(i)).collect_vec();
-        let ExtendStepper {
-            g,
-            dmax,
-            d,
-            dlow,
-            xorb,
-            extender,
-            ..
-        } = self;
         for i in imin..imax {
             self.extend_one(ne, rigid, ecount, data, nodes, splitlevel, &xs, &xcs, i);
         }
