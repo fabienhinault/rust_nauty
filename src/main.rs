@@ -50,6 +50,12 @@ static MAX_DEG: Lazy<usize> = Lazy::new(|| {
 });
 fn main() {
     let mut args = PARSED_ARGS.clone();
+    let (res, modulus) = match (args.res, args.modulus) {
+        (None, None) => (0, 1),
+        (None, Some(_)) => todo!(),
+        (Some(_), None) => todo!(),
+        (Some(res), Some(modulus)) => (res, modulus),
+    };
     let maxn = args.maxn;
     let maxe = args.maxe.unwrap_or((maxn * maxn - maxn) / 2);
     let mut maxdeg = args.maxdeg.unwrap_or(MAXN);
@@ -82,59 +88,63 @@ fn main() {
             ecount[0] += 1;
             println!("{}", Graph::one().to_graph6());
         }
-    } else {
-        let mut sparse = args.bipartite || args.squarefree || args.trianglefree || args.savemem;
-        if maxn > 28 || maxn + 4 > 8 * 64usize {
-            args.savemem = true;
-            sparse = true;
-        }
-        if maxn == maxe + 1 && connec > 0 {
-            args.bipartite = true;
-            args.squarefree = true;
-            sparse = true;
-        }
-        let mut data = LevelData::make(sparse, maxn, maxdeg);
-
-        let modulo = args.r#mod.unwrap_or(1);
-        let mut splitlevel = if args.maxn >= 14 && modulo > 1 {
-            (args.maxn - 4) as isize
-        } else if args.maxn >= 6 && modulo > 1 {
-            (args.maxn - 3) as isize
-        } else {
-            -1
-        };
-        if splitlevel > 0 {
-            splitlevel += args.splitlevinc.unwrap_or(0);
-        }
-        if splitlevel > (args.maxn - 1) as isize {
-            splitlevel = (args.maxn - 1) as isize;
-        }
-        if splitlevel < 3 {
-            splitlevel = -1;
-        }
-        let data_1 = &mut data[1];
-        let env = Env {
-            maxn,
-            maxe,
-            mine: args.mine.unwrap_or(0),
-            maxdeg: args.maxdeg.unwrap_or(MAXN),
-        };
-        data_1.xbnds(&env, 1, 0, 0);
-        let xlb = data_1.xlb;
-        let xub = data_1.xub;
-        let mut extender = Extender {
-            maxn,
-            mindeg,
-            nodes: vec![0; maxn],
-            connec,
-            canonise: args.canonise,
-            args,
-            splitlevel,
-            env: env.clone(),
-        };
-        let g = Graph::no_edge(1);
-        /* counts by number of edges */
-        let mut ecount: Vec<usize> = vec![0; 1 + maxn * (maxn - 1) / 2];
-        extender.genextend(g, 0, true, xlb, xub, &mut ecount, &mut data);
+        return;
     }
+    let mut sparse = args.bipartite || args.squarefree || args.trianglefree || args.savemem;
+    if maxn > 28 || maxn + 4 > 8 * 64usize {
+        args.savemem = true;
+        sparse = true;
+    }
+    if maxn == maxe + 1 && connec > 0 {
+        args.bipartite = true;
+        args.squarefree = true;
+        sparse = true;
+    }
+    const PRUNEMULT: usize = 50;
+    let multiplicity = args.multiplicity.unwrap_or(modulus * PRUNEMULT);
+
+    let mut data = LevelData::make(sparse, maxn, maxdeg);
+
+    let mut splitlevel = if args.maxn >= 14 && modulus > 1 {
+        (args.maxn - 4) as isize
+    } else if args.maxn >= 6 && modulus > 1 {
+        (args.maxn - 3) as isize
+    } else {
+        -1
+    };
+    if splitlevel > 0 {
+        splitlevel += args.splitlevinc.unwrap_or(0);
+    }
+    if splitlevel > (args.maxn - 1) as isize {
+        splitlevel = (args.maxn - 1) as isize;
+    }
+    if splitlevel < 3 {
+        splitlevel = -1;
+    }
+    let data_1 = &mut data[1];
+    let env = Env {
+        maxn,
+        maxe,
+        mine: args.mine.unwrap_or(0),
+        maxdeg: args.maxdeg.unwrap_or(MAXN),
+    };
+    data_1.xbnds(&env, 1, 0, 0);
+    let xlb = data_1.xlb;
+    let xub = data_1.xub;
+    let mut extender = Extender {
+        maxn,
+        mindeg,
+        nodes: vec![0; maxn],
+        connec,
+        canonise: args.canonise,
+        args,
+        splitlevel,
+        min_splitlevel: 6,
+        multiplicity,
+        env: env.clone(),
+    };
+    let g = Graph::no_edge(1);
+    /* counts by number of edges */
+    let mut ecount: Vec<usize> = vec![0; 1 + maxn * (maxn - 1) / 2];
+    extender.genextend(g, 0, true, xlb, xub, &mut ecount, &mut data);
 }

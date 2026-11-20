@@ -60,10 +60,12 @@ pub struct Extender {
     pub maxn: usize,
     pub mindeg: usize,
     pub connec: u8,
-    pub nodes: Vec<NautyCounter>,
+    pub nodes: Vec<usize>,
     pub canonise: bool,
     pub args: GengCli,
     pub splitlevel: isize,
+    pub min_splitlevel: usize,
+    pub multiplicity: usize,
     pub env: Env,
 }
 
@@ -262,6 +264,7 @@ impl Extender {
     ) {
         let n = g.n();
         let nx = n + 1;
+        self.nodes[n] += 1;
         let stepper = match self.init_extend(g, xlb, xub, data) {
             Some(value) => value,
             None => return,
@@ -270,6 +273,12 @@ impl Extender {
             self.print_leaves(stepper, ne, rigid, ecount, data);
         } else {
             self.extend1(stepper, ne, rigid, ecount, data);
+        }
+        if n == self.splitlevel as usize - 1
+            && n >= self.min_splitlevel
+            && self.nodes[n] >= self.multiplicity
+        {
+            self.splitlevel -= 1;
         }
     }
 
@@ -289,6 +298,7 @@ impl Extender {
             imin,
             imax,
             xorb,
+            ..
         } = stepper;
         let n = g.n();
         let nx = n + 1;
@@ -345,6 +355,7 @@ impl Extender {
             imin,
             imax,
             xorb,
+            ..
         } = stepper;
         let n = g.n();
         let nx = n + 1;
@@ -383,7 +394,7 @@ impl Extender {
     }
 
     fn init_extend(
-        &mut self,
+        &self,
         g: Graph,
         xlb: usize,
         xub: usize,
@@ -392,7 +403,6 @@ impl Extender {
         let n = g.n();
         let deg = (0..n).map(|i| g.deg(i)).collect_vec();
         let mut xlb = xlb;
-        self.nodes[n] += 1;
         let nx = n + 1;
         let dmax = deg[n - 1];
         let dcrit: Option<usize> = (self.mindeg + n).checked_sub(self.maxn);

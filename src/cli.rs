@@ -55,7 +55,7 @@ pub struct GengCli {
     #[arg(short = 'D')]
     pub maxdeg: Option<usize>,
     #[arg(short = 'x')]
-    multiplicity: Option<i32>,
+    pub multiplicity: Option<usize>,
     // split level increment
     #[arg(short = 'X')]
     pub splitlevinc: Option<isize>,
@@ -65,7 +65,7 @@ pub struct GengCli {
     #[arg(long)]
     pub maxe: Option<usize>,
     #[arg(long)]
-    pub r#mod: Option<usize>,
+    pub modulus: Option<usize>,
     #[arg(long)]
     pub res: Option<usize>,
     //#[arg(value_parser = clap::value_parser!(u64).range(1..=(WORDSIZE as u64)))]
