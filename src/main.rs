@@ -131,9 +131,18 @@ fn main() {
     data_1.xbnds(&env, 1, 0, 0);
     let xlb = data_1.xlb;
     let xub = data_1.xub;
+    fn is_graph(_: &Graph) -> bool {
+        true
+    }
+    let connec_predicate = match connec {
+        1 => Graph::isconnected,
+        2 => Graph::isbiconnected,
+        _ => is_graph,
+    };
     let extender = Extender {
         maxn,
         mindeg,
+        connec_predicate,
         connec,
         canonise: args.canonise,
         args,

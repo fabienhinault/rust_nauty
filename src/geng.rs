@@ -61,6 +61,7 @@ impl Graph {
 pub struct Extender {
     pub maxn: usize,
     pub mindeg: usize,
+    pub connec_predicate: fn(&Graph) -> bool,
     pub connec: u8,
     pub canonise: bool,
     pub args: GengCli,
@@ -405,11 +406,8 @@ struct ExtendStepper<'a> {
 
 impl<'a> ExtendStepper<'a> {
     fn print_leaves(self, ne: usize, rigid: bool, ecount: &mut [usize], data: &mut Vec<LevelData>) {
-        let n = self.g.n();
         for i in self.imin..self.imax {
-            if let ControlFlow::Break(_) = self.print_leaf(ne, rigid, ecount, data, i) {
-                continue;
-            }
+            self.print_leaf(ne, rigid, ecount, data, i);
         }
     }
 
@@ -420,7 +418,7 @@ impl<'a> ExtendStepper<'a> {
         ecount: &mut [usize],
         data: &mut Vec<LevelData>,
         i: usize,
-    ) -> ControlFlow<()> {
+    ) {
         let ExtendStepper {
             g,
             dmax,
@@ -432,15 +430,15 @@ impl<'a> ExtendStepper<'a> {
         } = self;
         let n = g.n();
         if !rigid && xorb[i] != i {
-            return ControlFlow::Break(());
+            return;
         }
         let x = data[n].xset(i);
         let xc = data[n].xcard(i);
         if xc == *dmax && (x & d) != 0 {
-            return ControlFlow::Break(());
+            return;
         }
         if (dlow & !x) != 0 {
-            return ControlFlow::Break(());
+            return;
         }
         if let Some((gx, _)) = extender.accept2(
             g,
@@ -461,7 +459,6 @@ impl<'a> ExtendStepper<'a> {
                 }
             );
         }
-        ControlFlow::Continue(())
     }
 }
 
