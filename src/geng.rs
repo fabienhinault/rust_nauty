@@ -264,7 +264,16 @@ impl Extender {
         ecount: &mut [usize],
         data: &mut Vec<LevelData>,
     ) {
-        let (n, nx, dmax, d, dlow, imin, imax, xorb) = match self.init_extend(g, xlb, xub, data) {
+        let n = g.n();
+        let nx = n + 1;
+        let ExtendStepper {
+            dmax,
+            d,
+            dlow,
+            imin,
+            imax,
+            xorb,
+        } = match self.init_extend(g, xlb, xub, data) {
             Some(value) => value,
             None => return,
         };
@@ -346,7 +355,7 @@ impl Extender {
         xlb: usize,
         xub: usize,
         data: &mut Vec<LevelData>,
-    ) -> Option<(usize, usize, usize, usize, usize, usize, usize, Vec<usize>)> {
+    ) -> Option<ExtendStepper> {
         let n = g.n();
         let deg = (0..n).map(|i| g.deg(i)).collect_vec();
         let mut xlb = xlb;
@@ -367,8 +376,24 @@ impl Extender {
         let imin = data[n].xstart[xlb];
         let imax = data[n].xstart[xub + 1];
         let xorb = data[n].xorb.clone();
-        Some((n, nx, dmax, d, dlow, imin, imax, xorb))
+        Some(ExtendStepper {
+            dmax,
+            d,
+            dlow,
+            imin,
+            imax,
+            xorb,
+        })
     }
+}
+
+struct ExtendStepper {
+    dmax: usize,
+    d: usize,
+    dlow: usize,
+    imin: usize,
+    imax: usize,
+    xorb: Vec<usize>,
 }
 
 fn d_dlow(n: usize, deg: Vec<usize>, dmax: usize, dcrit: Option<usize>) -> (usize, usize) {
