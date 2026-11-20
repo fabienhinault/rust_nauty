@@ -264,26 +264,10 @@ impl Extender {
         ecount: &mut [usize],
         data: &mut Vec<LevelData>,
     ) {
-        let n = g.n();
-        let deg = (0..n).map(|i| g.deg(i)).collect_vec();
-        let mut xlb = xlb;
-        self.nodes[n] += 1;
-        let nx = n + 1;
-        let dmax = deg[n - 1];
-        let dcrit: Option<usize> = (self.mindeg + n).checked_sub(self.maxn);
-        let (d, dlow) = d_dlow(n, deg, dmax, dcrit);
-        if xlb == dmax && d.count_ones() as usize + dmax > n {
-            xlb += 1;
-        }
-        if nx == self.maxn && xlb < self.mindeg {
-            xlb = self.mindeg;
-        }
-        if xlb > xub {
-            return;
-        }
-        let imin = data[n].xstart[xlb];
-        let imax = data[n].xstart[xub + 1];
-        let xorb = data[n].xorb.clone();
+        let (n, nx, dmax, d, dlow, imin, imax, xorb) = match self.init_extend(g, xlb, xub, data) {
+            Some(value) => value,
+            None => return,
+        };
         if nx == self.maxn {
             for i in imin..imax {
                 if !rigid && xorb[i] != i {
@@ -354,6 +338,36 @@ impl Extender {
                 }
             }
         }
+    }
+
+    fn init_extend(
+        &mut self,
+        g: &mut Graph,
+        xlb: usize,
+        xub: usize,
+        data: &mut Vec<LevelData>,
+    ) -> Option<(usize, usize, usize, usize, usize, usize, usize, Vec<usize>)> {
+        let n = g.n();
+        let deg = (0..n).map(|i| g.deg(i)).collect_vec();
+        let mut xlb = xlb;
+        self.nodes[n] += 1;
+        let nx = n + 1;
+        let dmax = deg[n - 1];
+        let dcrit: Option<usize> = (self.mindeg + n).checked_sub(self.maxn);
+        let (d, dlow) = d_dlow(n, deg, dmax, dcrit);
+        if xlb == dmax && d.count_ones() as usize + dmax > n {
+            xlb += 1;
+        }
+        if nx == self.maxn && xlb < self.mindeg {
+            xlb = self.mindeg;
+        }
+        if xlb > xub {
+            return None;
+        }
+        let imin = data[n].xstart[xlb];
+        let imax = data[n].xstart[xub + 1];
+        let xorb = data[n].xorb.clone();
+        Some((n, nx, dmax, d, dlow, imin, imax, xorb))
     }
 }
 
