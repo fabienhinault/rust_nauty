@@ -262,44 +262,36 @@ impl Extender {
     ) {
         let n = g.n();
         let nx = n + 1;
+        let stepper = match self.init_extend(g, xlb, xub, data) {
+            Some(value) => value,
+            None => return,
+        };
+        if nx == self.maxn {
+            self.print_leaves(stepper, ne, rigid, ecount, data);
+        } else {
+            self.extend1(stepper, ne, rigid, ecount, data);
+        }
+    }
+
+    fn extend1(
+        &mut self,
+        stepper: ExtendStepper,
+        ne: usize,
+        rigid: bool,
+        ecount: &mut [usize],
+        data: &mut Vec<LevelData>,
+    ) {
         let ExtendStepper {
+            g,
             dmax,
             d,
             dlow,
             imin,
             imax,
             xorb,
-        } = match self.init_extend(&g, xlb, xub, data) {
-            Some(value) => value,
-            None => return,
-        };
-        if nx == self.maxn {
-            self.print_leaves(
-                g, ne, rigid, ecount, data, n, dmax, d, dlow, imin, imax, &xorb,
-            );
-        } else {
-            self.extend1(
-                g, ne, rigid, ecount, data, n, nx, dmax, d, dlow, imin, imax, xorb,
-            );
-        }
-    }
-
-    fn extend1(
-        &mut self,
-        g: Graph,
-        ne: usize,
-        rigid: bool,
-        ecount: &mut [usize],
-        data: &mut Vec<LevelData>,
-        n: usize,
-        mut nx: usize,
-        dmax: usize,
-        d: usize,
-        dlow: usize,
-        imin: usize,
-        imax: usize,
-        xorb: Vec<usize>,
-    ) {
+        } = stepper;
+        let n = g.n();
+        let nx = n + 1;
         let xs: Vec<usize> = (imin..imax).map(|i| data[n].xset(i)).collect_vec();
         let xcs: Vec<usize> = (imin..imax).map(|i| data[n].xcard(i)).collect_vec();
         for i in imin..imax {
@@ -339,19 +331,23 @@ impl Extender {
 
     fn print_leaves(
         &mut self,
-        g: Graph,
+        stepper: ExtendStepper,
         ne: usize,
         rigid: bool,
         ecount: &mut [usize],
         data: &mut Vec<LevelData>,
-        n: usize,
-        dmax: usize,
-        d: usize,
-        dlow: usize,
-        imin: usize,
-        imax: usize,
-        xorb: &Vec<usize>,
     ) {
+        let ExtendStepper {
+            g,
+            dmax,
+            d,
+            dlow,
+            imin,
+            imax,
+            xorb,
+        } = stepper;
+        let n = g.n();
+        let nx = n + 1;
         for i in imin..imax {
             if !rigid && xorb[i] != i {
                 continue;
@@ -388,7 +384,7 @@ impl Extender {
 
     fn init_extend(
         &mut self,
-        g: &Graph,
+        g: Graph,
         xlb: usize,
         xub: usize,
         data: &mut Vec<LevelData>,
@@ -414,6 +410,7 @@ impl Extender {
         let imax = data[n].xstart[xub + 1];
         let xorb = data[n].xorb.clone();
         Some(ExtendStepper {
+            g,
             dmax,
             d,
             dlow,
@@ -425,6 +422,7 @@ impl Extender {
 }
 
 struct ExtendStepper {
+    g: Graph,
     dmax: usize,
     d: usize,
     dlow: usize,
