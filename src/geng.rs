@@ -404,13 +404,13 @@ impl Extender {
         }
     }
 
-    fn init_extend(
-        &self,
+    fn init_extend<'a>(
+        &'a self,
         g: Graph,
         xlb: usize,
         xub: usize,
         data: &mut Vec<LevelData>,
-    ) -> Option<ExtendStepper> {
+    ) -> Option<ExtendStepper<'a>> {
         let n = g.n();
         let deg = (0..n).map(|i| g.deg(i)).collect_vec();
         let mut xlb = xlb;
@@ -438,11 +438,12 @@ impl Extender {
             imin,
             imax,
             xorb,
+            extender: self,
         })
     }
 }
 
-struct ExtendStepper {
+struct ExtendStepper<'a> {
     g: Graph,
     dmax: usize,
     d: usize,
@@ -450,6 +451,7 @@ struct ExtendStepper {
     imin: usize,
     imax: usize,
     xorb: Vec<usize>,
+    extender: &'a Extender,
 }
 
 fn d_dlow(n: usize, deg: Vec<usize>, dmax: usize, dcrit: Option<usize>) -> (usize, usize) {
