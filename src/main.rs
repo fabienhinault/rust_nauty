@@ -143,7 +143,6 @@ fn main() {
         maxn,
         mindeg,
         connec_predicate,
-        connec,
         canonise: args.canonise,
         args,
         min_splitlevel: 6,

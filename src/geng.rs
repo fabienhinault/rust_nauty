@@ -62,7 +62,6 @@ pub struct Extender {
     pub maxn: usize,
     pub mindeg: usize,
     pub connec_predicate: fn(&Graph) -> bool,
-    pub connec: u8,
     pub canonise: bool,
     pub args: GengCli,
     pub min_splitlevel: usize,
@@ -335,9 +334,7 @@ impl Extender {
             data[nx].lo = data[nx].xstart[xlbx];
             data[nx].hi = data[nx].xstart[xubx + 1];
             if let Some((gx, rigidx)) = self.accept1(&g, x, &mut data[nx])
-                && (self.connec == 0
-                    || (self.connec == 1 && gx.isconnected())
-                    || (self.connec == 2 && gx.isbiconnected()))
+                && (self.connec_predicate)(&gx)
             {
                 self.genextend(
                     gx,
@@ -445,9 +442,7 @@ impl<'a> ExtendStepper<'a> {
             x,
             xc > dmax + 1 || (xc == dmax + 1 && (x & d) == 0),
             &mut data[n],
-        ) && (extender.connec == 0
-            || (extender.connec == 1 && gx.isconnected())
-            || (extender.connec == 2 && gx.isbiconnected()))
+        ) && (extender.connec_predicate)(&gx)
         {
             ecount[ne + xc] += 1;
             print!(
