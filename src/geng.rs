@@ -278,40 +278,61 @@ impl Extender {
                 g, ne, rigid, ecount, data, n, dmax, d, dlow, imin, imax, &xorb,
             );
         } else {
-            let xs: Vec<usize> = (imin..imax).map(|i| data[n].xset(i)).collect_vec();
-            let xcs: Vec<usize> = (imin..imax).map(|i| data[n].xcard(i)).collect_vec();
-            for i in imin..imax {
-                if !rigid && xorb[i] != i {
-                    continue;
-                }
-                let x = xs[i - imin];
-                let xc = xcs[i - imin];
-                if xc == dmax && (x & d) != 0 {
-                    continue;
-                }
-                if (dlow & !x) != 0 {
-                    continue;
-                }
-                if nx as isize == self.splitlevel {
-                    todo!();
-                }
-                if data[nx].edge_count != ne + xc || data[nx].dmax != xc {
-                    data[nx].xbnds(&self.env, nx, ne + xc, xc);
-                }
-                let xlbx = data[nx].xlb;
-                let xubx = data[nx].xub;
-                if xlbx > xubx {
-                    continue;
-                }
-                data[nx].lo = data[nx].xstart[xlbx];
-                data[nx].hi = data[nx].xstart[xubx + 1];
-                if let Some((mut gx, rigidx)) = self.accept1(g, x, &mut data[nx])
-                    && (self.connec == 0
-                        || (self.connec == 1 && gx.isconnected())
-                        || (self.connec == 2 && gx.isbiconnected()))
-                {
-                    self.genextend(&mut gx, ne + xc, rigidx, xlbx, xubx, ecount, data);
-                }
+            self.extend1(
+                g, ne, rigid, ecount, data, n, nx, dmax, d, dlow, imin, imax, xorb,
+            );
+        }
+    }
+
+    fn extend1(
+        &mut self,
+        g: &mut Graph,
+        ne: usize,
+        rigid: bool,
+        ecount: &mut [usize],
+        data: &mut Vec<LevelData>,
+        n: usize,
+        mut nx: usize,
+        dmax: usize,
+        d: usize,
+        dlow: usize,
+        imin: usize,
+        imax: usize,
+        xorb: Vec<usize>,
+    ) {
+        let xs: Vec<usize> = (imin..imax).map(|i| data[n].xset(i)).collect_vec();
+        let xcs: Vec<usize> = (imin..imax).map(|i| data[n].xcard(i)).collect_vec();
+        for i in imin..imax {
+            if !rigid && xorb[i] != i {
+                continue;
+            }
+            let x = xs[i - imin];
+            let xc = xcs[i - imin];
+            if xc == dmax && (x & d) != 0 {
+                continue;
+            }
+            if (dlow & !x) != 0 {
+                continue;
+            }
+            if nx as isize == self.splitlevel {
+                todo!();
+            }
+            if data[nx].edge_count != ne + xc || data[nx].dmax != xc {
+                data[nx].xbnds(&self.env, nx, ne + xc, xc);
+            }
+            let xlbx = data[nx].xlb;
+            let xubx = data[nx].xub;
+            if xlbx > xubx {
+                continue;
+            }
+            data[nx].lo = data[nx].xstart[xlbx];
+            data[nx].hi = data[nx].xstart[xubx + 1];
+            if let Some((mut gx, rigidx)) = self.accept1(g, x, &mut data[nx])
+                && (self.connec == 0
+                    || (self.connec == 1 && gx.isconnected())
+                    || (self.connec == 2 && gx.isbiconnected()))
+            {
+                self.genextend(&mut gx, ne + xc, rigidx, xlbx, xubx, ecount, data);
             }
         }
     }
