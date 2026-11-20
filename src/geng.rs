@@ -1,3 +1,5 @@
+use std::ops::ControlFlow;
+
 use crate::{
     cli::GengCli,
     env::Env,
@@ -403,49 +405,63 @@ struct ExtendStepper<'a> {
 
 impl<'a> ExtendStepper<'a> {
     fn print_leaves(self, ne: usize, rigid: bool, ecount: &mut [usize], data: &mut Vec<LevelData>) {
+        let n = self.g.n();
+        for i in self.imin..self.imax {
+            if let ControlFlow::Break(_) = self.print_leaf(ne, rigid, ecount, data, i) {
+                continue;
+            }
+        }
+    }
+
+    fn print_leaf(
+        &self,
+        ne: usize,
+        rigid: bool,
+        ecount: &mut [usize],
+        data: &mut Vec<LevelData>,
+        i: usize,
+    ) -> ControlFlow<()> {
         let ExtendStepper {
             g,
             dmax,
             d,
             dlow,
-            imin,
-            imax,
             xorb,
             extender,
+            ..
         } = self;
         let n = g.n();
-        for i in imin..imax {
-            if !rigid && xorb[i] != i {
-                continue;
-            }
-            let x = data[n].xset(i);
-            let xc = data[n].xcard(i);
-            if xc == dmax && (x & d) != 0 {
-                continue;
-            }
-            if (dlow & !x) != 0 {
-                continue;
-            }
-            if let Some((gx, _)) = extender.accept2(
-                &g,
-                x,
-                xc > dmax + 1 || (xc == dmax + 1 && (x & d) == 0),
-                &mut data[n],
-            ) && (extender.connec == 0
-                || (extender.connec == 1 && gx.isconnected())
-                || (extender.connec == 2 && gx.isbiconnected()))
-            {
-                ecount[ne + xc] += 1;
-                print!(
-                    "{}",
-                    if extender.canonise {
-                        gx.canonise().to_graph6()
-                    } else {
-                        gx.to_graph6()
-                    }
-                );
-            }
+        if !rigid && xorb[i] != i {
+            return ControlFlow::Break(());
         }
+        let x = data[n].xset(i);
+        let xc = data[n].xcard(i);
+        if xc == *dmax && (x & d) != 0 {
+            return ControlFlow::Break(());
+        }
+        if (dlow & !x) != 0 {
+            return ControlFlow::Break(());
+        }
+        if let Some((gx, _)) = extender.accept2(
+            g,
+            x,
+            xc > dmax + 1 || (xc == dmax + 1 && (x & d) == 0),
+            &mut data[n],
+        ) && (extender.connec == 0
+            || (extender.connec == 1 && gx.isconnected())
+            || (extender.connec == 2 && gx.isbiconnected()))
+        {
+            ecount[ne + xc] += 1;
+            print!(
+                "{}",
+                if extender.canonise {
+                    gx.canonise().to_graph6()
+                } else {
+                    gx.to_graph6()
+                }
+            );
+        }
+        ControlFlow::Continue(())
     }
 }
 
