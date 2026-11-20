@@ -139,10 +139,12 @@ fn main() {
         2 => Graph::isbiconnected,
         _ => is_graph,
     };
+    let filter_predicates = build_filter_predicates(&args);
     let extender = Extender {
         maxn,
         mindeg,
         connec_predicate,
+        filter_predicates,
         canonise: args.canonise,
         args,
         min_splitlevel: 6,
@@ -164,4 +166,34 @@ fn main() {
         &mut nodes,
         &mut splitlevel,
     );
+}
+
+fn build_filter_predicates(args: &GengCli) -> Vec<fn(&Graph, maxn: usize, maxe: usize) -> bool> {
+    let mut filter_predicates: Vec<fn(&Graph, maxn: usize, maxe: usize) -> bool> = vec![];
+    if args.k4free {
+        fn has_no_k4(g: &Graph, _maxn: usize, _maxe: usize) -> bool {
+            !g.hask4()
+        }
+        filter_predicates.push(has_no_k4);
+    }
+    if args.clawfree {
+        fn has_no_claw(g: &Graph, _maxn: usize, _maxe: usize) -> bool {
+            !g.hasclaw()
+        }
+        filter_predicates.push(has_no_claw);
+    }
+    if args.connec2 {
+        fn connec2_predicate(g: &Graph, maxn: usize, maxe: usize) -> bool {
+            (g.n() + 1 == maxn && !g.isconnected())
+                || (g.n() + 1 < maxn && g.connpreprune(maxn, maxe))
+        }
+        filter_predicates.push(connec2_predicate);
+    }
+    if args.connec1 {
+        fn connec1_predicate(g: &Graph, maxn: usize, maxe: usize) -> bool {
+            g.n() < maxn && g.connpreprune(maxn, maxe)
+        }
+        filter_predicates.push(connec1_predicate);
+    }
+    filter_predicates
 }

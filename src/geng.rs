@@ -35,9 +35,8 @@ impl Graph {
 
     /* This function speeds up the generation of connected graphs
     with not many edges. */
-    pub fn connpreprune(&self, args: &GengCli) -> bool {
-        let maxn = args.maxn;
-        let maxe = args.maxe();
+    // 658
+    pub fn connpreprune(&self, maxn: usize, maxe: usize) -> bool {
         if self.n() == maxn || maxe - maxn >= 5 {
             return false;
         }
@@ -62,6 +61,7 @@ pub struct Extender {
     pub maxn: usize,
     pub mindeg: usize,
     pub connec_predicate: fn(&Graph) -> bool,
+    pub filter_predicates: Vec<fn(&Graph, maxn: usize, maxe: usize) -> bool>,
     pub canonise: bool,
     pub args: GengCli,
     pub min_splitlevel: usize,
@@ -77,18 +77,7 @@ impl Extender {
         let nx = n + 1;
         let mut gx = g.clone();
         gx.push(Set::from_sym_usize(x, nx));
-        if self.args.k4free && gx.hask4() {
-            return None;
-        }
-        if self.args.clawfree && gx.hasclaw() {
-            return None;
-        }
-        if self.args.connec2 && n + 2 == self.maxn && !g.isconnected() {
-            return None;
-        }
-        if ((self.args.connec2 && n + 2 < self.maxn) || (self.args.connec1 && n + 2 <= self.maxn))
-            && gx.connpreprune(&self.args)
-        {
+        if !self.all_filter_predicates(&gx) {
             return None;
         }
         let nest = gx.degs_partition_nest();
@@ -134,6 +123,12 @@ impl Extender {
         }
     }
 
+    fn all_filter_predicates(&self, gx: &Graph) -> bool {
+        self.filter_predicates
+            .iter()
+            .all(|f| f(gx, self.maxn, self.args.maxe()))
+    }
+
     /* decide if n in theta(g+x)  --  version for n+1 == maxn */
     // 1935
     #[allow(clippy::too_many_arguments)]
@@ -148,18 +143,7 @@ impl Extender {
         let nx = n + 1;
         let mut gx = g.clone();
         gx.push(Set::from_sym_usize(x, nx));
-        if self.args.k4free && gx.hask4() {
-            return None;
-        }
-        if self.args.clawfree && gx.hasclaw() {
-            return None;
-        }
-        if self.args.connec2 && n + 2 == self.maxn && !g.isconnected() {
-            return None;
-        }
-        if ((self.args.connec2 && n + 2 < self.maxn) || (self.args.connec1 && n + 2 <= self.maxn))
-            && gx.connpreprune(&self.args)
-        {
+        if !self.all_filter_predicates(&gx) {
             return None;
         }
         if nuniq {
