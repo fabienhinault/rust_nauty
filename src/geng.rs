@@ -1,20 +1,14 @@
-use std::assert_eq;
-
 use crate::{
     cli::GengCli,
     env::Env,
     graph::Graph,
-    level_data::{LevelData, xnextbit},
+    level_data::LevelData,
     nauty::{
         NautyCounter, OptionBlk, Set, SetTrait, StatBlk, graph, nauty,
-        partition_nest::{
-            PartitionNest,
-            partition::{Partition, cell_mut::SplitResult},
-        },
+        partition_nest::partition::{Partition, cell_mut::SplitResult},
     },
 };
-use bitvec::prelude::Msb0;
-use bitvec::{prelude::BitVec, view::BitView};
+use bitvec::prelude::BitVec;
 use itertools::Itertools;
 
 #[inline(always)]
@@ -215,7 +209,7 @@ impl Extender {
         }
         let mut code = 0;
         let mut partition = Partition { nest, level: 0 };
-        refinex(&mut gx, &mut partition, &mut active, false, &mut code);
+        refinex(&gx, &mut partition, &mut active, false, &mut code);
         if code < 0 {
             return None;
         }
@@ -225,10 +219,12 @@ impl Extender {
             return Some((gx, gcan));
         }
 
-        let mut options: OptionBlk = OptionBlk::default();
-        options.getcanon = 1;
-        options.defaultptn = false;
-        options.userautomproc = Some(data);
+        let mut options: OptionBlk = OptionBlk::<'_> {
+            getcanon: 1,
+            defaultptn: false,
+            userautomproc: Some(data),
+            ..Default::default()
+        };
         active = BitVec::zeros(nx);
         let mut orbits: Vec<usize> = vec![];
         let mut h: Graph = Graph::no_edge(nx);
@@ -278,38 +274,9 @@ impl Extender {
             None => return,
         };
         if nx == self.maxn {
-            for i in imin..imax {
-                if !rigid && xorb[i] != i {
-                    continue;
-                }
-                let x = data[n].xset(i);
-                let xc = data[n].xcard(i);
-                if xc == dmax && (x & d) != 0 {
-                    continue;
-                }
-                if (dlow & !x) != 0 {
-                    continue;
-                }
-                if let Some((gx, _)) = self.accept2(
-                    g,
-                    x,
-                    xc > dmax + 1 || (xc == dmax + 1 && (x & d) == 0),
-                    &mut data[n],
-                ) && (self.connec == 0
-                    || (self.connec == 1 && gx.isconnected())
-                    || (self.connec == 2 && gx.isbiconnected()))
-                {
-                    ecount[ne + xc] += 1;
-                    print!(
-                        "{}",
-                        if self.canonise {
-                            gx.canonise().to_graph6()
-                        } else {
-                            gx.to_graph6()
-                        }
-                    );
-                }
-            }
+            self.print_leaves(
+                g, ne, rigid, ecount, data, n, dmax, d, dlow, imin, imax, &xorb,
+            );
         } else {
             let xs: Vec<usize> = (imin..imax).map(|i| data[n].xset(i)).collect_vec();
             let xcs: Vec<usize> = (imin..imax).map(|i| data[n].xcard(i)).collect_vec();
@@ -345,6 +312,55 @@ impl Extender {
                 {
                     self.genextend(&mut gx, ne + xc, rigidx, xlbx, xubx, ecount, data);
                 }
+            }
+        }
+    }
+
+    fn print_leaves(
+        &mut self,
+        g: &mut Graph,
+        ne: usize,
+        rigid: bool,
+        ecount: &mut [usize],
+        data: &mut Vec<LevelData>,
+        n: usize,
+        dmax: usize,
+        d: usize,
+        dlow: usize,
+        imin: usize,
+        imax: usize,
+        xorb: &Vec<usize>,
+    ) {
+        for i in imin..imax {
+            if !rigid && xorb[i] != i {
+                continue;
+            }
+            let x = data[n].xset(i);
+            let xc = data[n].xcard(i);
+            if xc == dmax && (x & d) != 0 {
+                continue;
+            }
+            if (dlow & !x) != 0 {
+                continue;
+            }
+            if let Some((gx, _)) = self.accept2(
+                g,
+                x,
+                xc > dmax + 1 || (xc == dmax + 1 && (x & d) == 0),
+                &mut data[n],
+            ) && (self.connec == 0
+                || (self.connec == 1 && gx.isconnected())
+                || (self.connec == 2 && gx.isbiconnected()))
+            {
+                ecount[ne + xc] += 1;
+                print!(
+                    "{}",
+                    if self.canonise {
+                        gx.canonise().to_graph6()
+                    } else {
+                        gx.to_graph6()
+                    }
+                );
             }
         }
     }
@@ -459,7 +475,7 @@ pub fn refinex(
                     continue;
                 }
                 match cell.split_from_splitters(&splitters, g) {
-                    SplitResult::Const(bmin) => {
+                    SplitResult::Const(_bmin) => {
                         continue;
                     }
                     SplitResult::Split {
