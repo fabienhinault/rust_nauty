@@ -252,7 +252,7 @@ impl Extender {
     #[allow(clippy::too_many_arguments)]
     pub fn genextend(
         &mut self,
-        g: &mut graph::Graph,
+        g: graph::Graph,
         ne: usize,
         rigid: bool,
         xlb: usize,
@@ -269,7 +269,7 @@ impl Extender {
             imin,
             imax,
             xorb,
-        } = match self.init_extend(g, xlb, xub, data) {
+        } = match self.init_extend(&g, xlb, xub, data) {
             Some(value) => value,
             None => return,
         };
@@ -286,7 +286,7 @@ impl Extender {
 
     fn extend1(
         &mut self,
-        g: &mut Graph,
+        g: Graph,
         ne: usize,
         rigid: bool,
         ecount: &mut [usize],
@@ -327,19 +327,19 @@ impl Extender {
             }
             data[nx].lo = data[nx].xstart[xlbx];
             data[nx].hi = data[nx].xstart[xubx + 1];
-            if let Some((mut gx, rigidx)) = self.accept1(g, x, &mut data[nx])
+            if let Some((gx, rigidx)) = self.accept1(&g, x, &mut data[nx])
                 && (self.connec == 0
                     || (self.connec == 1 && gx.isconnected())
                     || (self.connec == 2 && gx.isbiconnected()))
             {
-                self.genextend(&mut gx, ne + xc, rigidx, xlbx, xubx, ecount, data);
+                self.genextend(gx, ne + xc, rigidx, xlbx, xubx, ecount, data);
             }
         }
     }
 
     fn print_leaves(
         &mut self,
-        g: &mut Graph,
+        g: Graph,
         ne: usize,
         rigid: bool,
         ecount: &mut [usize],
@@ -365,7 +365,7 @@ impl Extender {
                 continue;
             }
             if let Some((gx, _)) = self.accept2(
-                g,
+                &g,
                 x,
                 xc > dmax + 1 || (xc == dmax + 1 && (x & d) == 0),
                 &mut data[n],
@@ -388,7 +388,7 @@ impl Extender {
 
     fn init_extend(
         &mut self,
-        g: &mut Graph,
+        g: &Graph,
         xlb: usize,
         xub: usize,
         data: &mut Vec<LevelData>,
