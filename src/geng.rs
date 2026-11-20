@@ -60,7 +60,6 @@ pub struct Extender {
     pub maxn: usize,
     pub mindeg: usize,
     pub connec: u8,
-    pub nodes: Vec<usize>,
     pub canonise: bool,
     pub args: GengCli,
     pub splitlevel: isize,
@@ -261,10 +260,11 @@ impl Extender {
         xub: usize,
         ecount: &mut [usize],
         data: &mut Vec<LevelData>,
+        nodes: &mut Vec<usize>,
     ) {
         let n = g.n();
         let nx = n + 1;
-        self.nodes[n] += 1;
+        nodes[n] += 1;
         let stepper = match self.init_extend(g, xlb, xub, data) {
             Some(value) => value,
             None => return,
@@ -272,11 +272,11 @@ impl Extender {
         if nx == self.maxn {
             self.print_leaves(stepper, ne, rigid, ecount, data);
         } else {
-            self.extend1(stepper, ne, rigid, ecount, data);
+            self.extend1(stepper, ne, rigid, ecount, data, nodes);
         }
         if n == self.splitlevel as usize - 1
             && n >= self.min_splitlevel
-            && self.nodes[n] >= self.multiplicity
+            && nodes[n] >= self.multiplicity
         {
             self.splitlevel -= 1;
         }
@@ -289,6 +289,7 @@ impl Extender {
         rigid: bool,
         ecount: &mut [usize],
         data: &mut Vec<LevelData>,
+        nodes: &mut Vec<usize>,
     ) {
         let ExtendStepper {
             g,
@@ -334,7 +335,7 @@ impl Extender {
                     || (self.connec == 1 && gx.isconnected())
                     || (self.connec == 2 && gx.isbiconnected()))
             {
-                self.genextend(gx, ne + xc, rigidx, xlbx, xubx, ecount, data);
+                self.genextend(gx, ne + xc, rigidx, xlbx, xubx, ecount, data, nodes);
             }
         }
     }

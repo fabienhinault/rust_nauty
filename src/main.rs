@@ -134,7 +134,6 @@ fn main() {
     let mut extender = Extender {
         maxn,
         mindeg,
-        nodes: vec![0; maxn],
         connec,
         canonise: args.canonise,
         args,
@@ -143,8 +142,9 @@ fn main() {
         multiplicity,
         env: env.clone(),
     };
+    let mut nodes = vec![0; maxn];
     let g = Graph::no_edge(1);
     /* counts by number of edges */
     let mut ecount: Vec<usize> = vec![0; 1 + maxn * (maxn - 1) / 2];
-    extender.genextend(g, 0, true, xlb, xub, &mut ecount, &mut data);
+    extender.genextend(g, 0, true, xlb, xub, &mut ecount, &mut data, &mut nodes);
 }
