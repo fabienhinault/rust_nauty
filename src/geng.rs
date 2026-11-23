@@ -132,13 +132,7 @@ impl Extender {
     /* decide if n in theta(g+x)  --  version for n+1 == maxn */
     // 1935
     #[allow(clippy::too_many_arguments)]
-    fn accept2(
-        &self,
-        g: &Graph,
-        x: usize,
-        nuniq: bool,
-        data: &mut LevelData,
-    ) -> Option<(Graph, Option<Graph>)> {
+    fn accept2(&self, g: &Graph, x: usize, nuniq: bool, data: &mut LevelData) -> Option<Graph> {
         let n = g.n();
         let nx = n + 1;
         let mut gx = g.clone();
@@ -147,8 +141,7 @@ impl Extender {
             return None;
         }
         if nuniq {
-            let gcan = self.args.canonise.then(|| gx.canonise());
-            return Some((gx, gcan));
+            return Some(gx);
         }
         let mut nest = gx.degs_partition_nest();
         let mut active = Set::zeros(nx);
@@ -162,8 +155,7 @@ impl Extender {
                         let j0 = nest.apply_distance_invariant(0, &invar);
                         if j0 > 0 {
                             if j0 == n {
-                                let gcan = self.args.canonise.then(|| gx.canonise());
-                                return Some((gx, gcan));
+                                return Some(gx);
                             }
                             active.set(j0, true);
                         }
@@ -186,8 +178,7 @@ impl Extender {
                 let j0 = nest.apply_distance_invariant(extra_zero_index + 1, &gvs);
                 if j0 > 0 {
                     if j0 == n {
-                        let gcan = self.args.canonise.then(|| gx.canonise());
-                        return Some((gx, gcan));
+                        return Some(gx);
                     }
                     active.set(j0, true);
                 }
@@ -201,8 +192,7 @@ impl Extender {
         }
         let cheapacc: bool = partition.cheapacc(code);
         if cheapacc {
-            let gcan = self.args.canonise.then(|| gx.canonise());
-            return Some((gx, gcan));
+            return Some(gx);
         }
 
         let mut options: OptionBlk = OptionBlk::<'_> {
@@ -226,8 +216,7 @@ impl Extender {
         );
         options.userautomproc = None;
         if orbits[partition[n]] == orbits[n] {
-            let gcan = self.args.canonise.then(|| gx.canonise());
-            Some((gx, gcan))
+            Some(gx)
         } else {
             None
         }
@@ -354,7 +343,7 @@ impl<'a> ExtendStepper<'a> {
         if (dlow & !x) != 0 {
             return;
         }
-        if let Some((gx, _)) = extender.accept2(
+        if let Some(gx) = extender.accept2(
             g,
             x,
             xc > dmax + 1 || (xc == dmax + 1 && (x & d) == 0),
